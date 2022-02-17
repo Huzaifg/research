@@ -18,3 +18,7 @@ extern "C" double* linear_viscoelastic_model(double eta,double gamma,double *str
 	}
 	return q;
 }
+
+extern "C" void free_mem(double *a){
+	delete[] a;
+}
