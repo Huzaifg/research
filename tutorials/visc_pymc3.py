@@ -101,19 +101,33 @@ def pred_model(theta):
     free_mem(y_visc)
     return y_total
 
-#This is just a gaussian log likelihood - Similar to the SOS function we need to define in pymcmcstat
+#This is just a gaussian log likelihood
 def my_loglike(theta,data):
     model = pred_model(theta)
     gamma,eta,sigma = theta
-    #Data needs some reshaping as its a row vector - transpose and then make it (ndatapoints,1)
     res = model - data.T.reshape(-1,1)
-    return -(0.5)*np.sum((res)**2/sigma**2)
+    logp = -len(data) * np.log(np.sqrt(2. * np.pi) * sigma)
+    logp += (-1)*np.sum((res)**2/(2.*sigma**2))
+    
+    return logp
+#This is the gradient of the log likelihood function
+def grad_loglike(theta,data):
+    def loglike(theta):
+        return my_loglike(theta,data)
+    
+    #We are not doing finite difference approximation and we define delx as the finite precision 
+    delx = np.sqrt(np.finfo(float).eps)
+    #We are approximating the partial derivative of the log likelihood with finite difference
+    #We have to define delx for each partial derivative of loglike with theta's
+    grads = sp.optimize.approx_fprime(theta,loglike,delx*np.ones(len(theta)))
+    return grads
+
+
 
 # Copy paste the theano Operation class from stackoverflow - 
 #https://stackoverflow.com/questions/41109292/solving-odes-in-pymc3
 
-# define a theano Op for our likelihood function - This is needed because in order to supply the loglikelihood function to pymc3, we need to make it a 
-#theno operation. This wrapper class does exactly that.
+# define a theano Op for our likelihood function
 class LogLike(tt.Op):
 
     """
@@ -146,19 +160,42 @@ class LogLike(tt.Op):
         # add inputs as class attributes
         self.likelihood = loglike
         self.data = data
+        self.loglike_grad = LoglikeGrad(self.data)
 
     def perform(self, node, inputs, outputs):
         # the method that is used when calling the Op
         theta, = inputs  # this will contain my variables
 
         # call the log-likelihood function
-        logl = self.likelihood(theta, self.data)
+        logp = self.likelihood(theta, self.data)
 
-        outputs[0][0] = np.array(logl) # output the log-likelihood
+        outputs[0][0] = np.array(logp) # output the log-likelihood
+    def grad(self,inputs,grad_outputs):
+        theta, = inputs
+        grads = self.loglike_grad(theta)
+        return [grad_outputs[0] * grads]
+        
+        
+#Similarly wrapper class for loglike gradient
+class LoglikeGrad(tt.Op):
+    itypes = [tt.dvector]
+    otypes = [tt.dvector]
+
+    def __init__(self,data):
+        self.der_likelihood = grad_loglike
+        self.data = data
+
+    def perform(self, node, inputs, outputs):
+        (theta,) = inputs
+        grads = self.der_likelihood(theta, self.data)
+        outputs[0][0] = grads
+
+
+
 def main():
 	#Specify number of draws as a command line argument
 	if(len(sys.argv) < 2):
-		print("Please provide the number of draws")
+		print("Please provide the number of draws and the stepping method")
 	ndraws = int(sys.argv[1])
 	#Always burn half - can chnage this at some point
 	nburn = int(ndraws/2)
@@ -169,7 +206,7 @@ def main():
 	    gamma = pm.Uniform("gamma",lower=0,upper=10000,testval = 31)
 	    eta = pm.Uniform("eta",lower=0,upper=10000,testval = 708)
 	    #We are also sampling our observation noise - Seems like a standard to use Half normal for this
-	    sigma = pm.HalfNormal("sigma",sigma = 0.6,testval=0.01)
+	    sigma = pm.HalfNormal("sigma",sigma = 0.6,testval=0.1)
 	    #Convert the parameters into a theano tensor
 	    theta = tt.as_tensor_variable([gamma,eta,sigma])
 	    
@@ -180,13 +217,18 @@ def main():
 	#Now we sample!
 	with model:
 		#We use metropolis as the algorithm with parameters to be sampled supplied through vars
-	    step = pm.Metropolis(vars=[eta, gamma, sigma])
-	    #We provide starting values for our parameters
-	    trace = pm.sample(ndraws, tune=nburn, discard_tuned_samples=True,start={'gamma': 31., 'eta':708., 'sigma':0.01},cores=1)
-	    #Print the summary of all the parameters
-	    print(pm.summary(trace).to_string())
-	    df_sum = pm.summary(trace)
-	#Save the trace in date directory
+		if(sys.argv[2] == "nuts"):
+			step = pm.NUTS(vars=[eta, gamma, sigma])
+		elif(sys.argv[2] == "met"):
+			step = pm.Metropolis(vars=[eta, gamma, sigma])
+		else:
+			print("Please provide nuts or met as the stepping method")
+		#We provide starting values for our parameters
+		trace = pm.sample(ndraws,step=step, tune=nburn, discard_tuned_samples=True,start={'gamma': 31., 'eta':708., 'sigma':0.1},cores=2)
+		#Print the summary of all the parameters
+		print(pm.summary(trace).to_string())
+		df_sum = pm.summary(trace)
+		#Save the trace in date directory
 	pm.save_trace(directory = savedir + '_' + str(ndraws),trace=trace)
 
 	#Plot a scatter matrix to show correlations
