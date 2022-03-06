@@ -2,6 +2,7 @@ import numpy as np
 from math import atan,cos,sin
 
 import warnings
+# warnings.filterwarnings("error")
 
 def vehicle_bi(theta,tt,st_input,init_cond):
 	"""
@@ -41,7 +42,7 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 
 	# Supplied Initial Conditions
 
-	Vy=init_cond['Vy'] # lateral velocity
+	Vy=init_cond['Vy'] # lateral velocity 	
 	Vx=init_cond['Vx'] # longitudinal velocity
 	psi=init_cond['psi'] # yaw anlge
 	psi_dot=init_cond['psi_dot'] # yaw rate 
@@ -72,7 +73,10 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 		delta_r=delta3[i]
 		#longitudinal slips ratio
 		sf=(Rr*wf-(Vx*cos(delta_r)+(Vy+a*psi_dot)*sin(delta_r)))/abs(Vx*cos(delta_r)+(Vy+a*psi_dot)*sin(delta_r))
+
 		sr=(Rr*wr-Vx)/abs(Vx)
+		# if(i > 1):
+		# 	print(f"{i = }, {Vx = }, {Vy =}, {psi_dot = }, {delta_r = },{sf = },{sr =}")
 		#longitudinal tire force 
 		Fxtf=Cxf*sf
 		Fxtr=Cxr*sr
@@ -82,9 +86,20 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 		wf=wf+T*dwf
 		wr=wr+T*dwr
 
-		# calculate the response according to vehicle model equations 
+		# calculate the response according to vehicle model equations
+		# try:
+		# 	Vy_dot=-Vx*psi_dot+(1/m)*(Cf*((Vy+a*psi_dot)/Vx-delta_r)+Cr*((Vy-b*psi_dot)/Vx))
+		# 	Vx_dot=Vy*psi_dot+(sf*Cxf+sr*Cxr)/m-delta_r*Cf*((Vy+a*psi_dot)/Vx-delta_r)/m
+		# except RuntimeWarning:
+		# 	Vx = 50/3.6
+		# 	Vy = 0
+		# 	Vy_dot=-Vx*psi_dot+(1/m)*(Cf*((Vy+a*psi_dot)/Vx-delta_r)+Cr*((Vy-b*psi_dot)/Vx))
+		# 	Vx_dot=Vy*psi_dot+(sf*Cxf+sr*Cxr)/m-delta_r*Cf*((Vy+a*psi_dot)/Vx-delta_r)/m
+
+		
 		Vy_dot=-Vx*psi_dot+(1/m)*(Cf*((Vy+a*psi_dot)/Vx-delta_r)+Cr*((Vy-b*psi_dot)/Vx))
 		Vx_dot=Vy*psi_dot+(sf*Cxf+sr*Cxr)/m-delta_r*Cf*((Vy+a*psi_dot)/Vx-delta_r)/m
+
 		dpsi_dot=1/Iz*(a*Cf*((Vy+a*psi_dot)/Vx-delta_r)-b*Cr*((Vy-b*psi_dot)/Vx))
 		Y_dot=Vx*sin(psi)+Vy*cos(psi)
 		X_dot=Vx*cos(psi)-Vy*sin(psi)
@@ -103,10 +118,26 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 		psi_dot_[i]=psi_dot #Yaw rate
 		Y_[i]=Y #Y position
 		X_[i]=X #X position
+		# try:
+		# 	lateral_acc_[i]=Vy_dot+Vx*psi_dot #Lateral Acceleration
+		# except RuntimeWarning:
+		# 	lateral_acc_[i] = 0
 		lateral_acc_[i]=Vy_dot+Vx*psi_dot #Lateral Acceleration
+		# except RuntimeWarning:
+		# 	return np.ones(shape = (5,size_tt))*1.e50
 
-	return psi_dot_.reshape(-1,)
 
+	#Reshape all our outputs
+	Vx_ = Vx_.reshape(-1,)
+	Vy_ = Vy_.reshape(-1,)
+	psi_ = psi_.reshape(-1,)
+	psi_dot_ = psi_dot_.reshape(-1,)
+	lateral_acc_ = lateral_acc_.reshape(-1,)
+
+
+	mod_data = np.array([Vx_,Vy_,psi_,psi_dot_,lateral_acc_])
+
+	return mod_data
 
 
 
