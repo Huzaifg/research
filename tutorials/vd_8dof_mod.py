@@ -2,8 +2,8 @@
 import numpy as np
 from math import atan,cos,sin
 from scipy.integrate import solve_ivp
-import warnings
-warnings.filterwarnings("error")
+# import warnings
+# warnings.filterwarnings("error")
 
 
 def vehicle_8dof(theta,tt,st_input,init_cond):
@@ -17,7 +17,7 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
 
     theta : 
         A list of all the parameters of the model. These are also all the parameters that are inferred from the bayesian inference. 
-        Need to find a way to pass a dict - list is too error prone
+        Need to find a way to pass a dict - list is too error prone - pymc3 only takes lists
     tt :
         Time intervals at which the "data" is "collected"
 
@@ -26,6 +26,14 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
 
     init_cond:
         These are the initial conditions of the vehicle.
+
+
+    Returns:
+    -------
+    
+    mod_data :
+        Matrix with size (no_of_outputs X no_of_timesteps) ---- ex. row 0 of mod_data is the longitudanal veclocity vector at each time step
+
 
     """
 
@@ -208,13 +216,10 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
         dpsi=wz
         dphi=wx
         ## Wheel rotational modelling
-        try:
-            dwlf=-(1/Jw)*Fxtlf*Rlf
-            dwrf=-(1/Jw)*Fxtrf*Rrf
-            dwlr=-(1/Jw)*Fxtlr*Rlr
-            dwrr=-(1/Jw)*Fxtrr*Rrr
-        except:
-            print(Jw,Fxtlf,Rlf)
+        dwlf=-(1/Jw)*Fxtlf*Rlf
+        dwrf=-(1/Jw)*Fxtrf*Rrf
+        dwlr=-(1/Jw)*Fxtlr*Rlr
+        dwrr=-(1/Jw)*Fxtrr*Rrr
         ## Solving the related ODE's
         sol = solve_ivp(lambda t,wlf: dwlf,(ts[0],ts[-1]),[wlf],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
         wlf = sol.y[-1][-1]
@@ -235,8 +240,9 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
         ## vehicle lateral acceleration
         ay[ind]=u*wz+v_dot
 
-        #For now lets just return one of the vectors, we will first work on just using one of the outputs for the bayesian inference
-    return yaw_rate.reshape(-1,)
+    #For now lets just return one of the vectors, we will first work on just using one of the outputs for the bayesian inference
+    mod_data = np.array([long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay])
+    return mod_data
 
 
 
