@@ -21,16 +21,18 @@ from vd_bi_mod import vehicle_bi
 
 def main():
 
-	vbdata = sio.loadmat('vd_14dof_470.mat')
+	vbdata = sio.loadmat('vd_8dof_4700.mat')
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
 	# st_inp_rad = st_inp_o*np.pi/180
 	lat_acc_o = vbdata['ay1'].reshape(-1,)
 	lat_vel_o = vbdata['lat_vel'].reshape(-1,)
+	long_vel_o = vbdata['long_vel'].reshape(-1,)
 	roll_angle_o = vbdata['roll_angle'].reshape(-1,)
 	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
 	psi_angle_o = vbdata['psi_angle'].reshape(-1,)
-
+	data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
+	
 	##vehicle model parameters
 	a=1.14  # distance of c.g. from front axle (m)
 	b=1.4  # distance of c.g. from rear axle  (m)
@@ -60,21 +62,24 @@ def main():
 	print(f"Time taken is {end-start}")
 
 
-	# ### Compare the outputs with plots to validate
-	# mpl.style.use('plot_style.mplstyle')
-	# mpl.figure(1,figsize = (8,8))
-	# mpl.plot(time_o,yaw_rate,'r',time_o,yaw_rate_o,'k')
-	# mpl.title('yaw rate vs time')
-	# mpl.xlabel('time (s)')
-	# mpl.ylabel('yaw rate (rad/s)')
-	# mpl.legend(['yaw rate 14dof','yaw rate bi'])
-	# mpl.grid()
-	# mpl.savefig('./images/comp_14bi.png',facecolor = 'w')
-	# mpl.show()
+
+	rows  = mod_data.shape[0]
+	mpl.style.use('plot_style.mplstyle')
+	mpl.figure(1,figsize = (8,8))
+	for i in range(0,rows):
+		### Compare the outputs with plots to validate
+		mpl.plot(time_o,data[i,:],'r',time_o,mod_data[i,:],'k')
+		mpl.title('plot 1')
+		mpl.xlabel('time (s)')
+		mpl.ylabel('data[i,:]')
+		mpl.legend(['14dof','2dof'])
+		mpl.grid()
+		mpl.savefig('./images/comp.png',facecolor = 'w')
+		mpl.show()
 
 
 
 
 if __name__ == "__main__":
-    main()
+	main()
 

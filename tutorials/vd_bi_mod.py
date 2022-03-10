@@ -62,6 +62,7 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 
 	ts = tt[1] - tt[0] ##the time step
 	size_tt = len(tt)
+	print(f"End time is {tt[-1]}")
 	Tsim = ts*size_tt - ts #The end time
 	T = ts #Since the code from matlab uses this variable for calculations
 
@@ -116,6 +117,8 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 
 
 	mod_data = np.array([Vx_,Vy_,psi_,psi_dot_,lateral_acc_])
+	
+
 
 	return mod_data
 

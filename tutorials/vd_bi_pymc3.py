@@ -26,28 +26,23 @@ def add_noise(a):
 
 #This is just a gaussian log likelihood - Right now our data is just a vector so its almost the same as the previous example
 def loglike(theta,time_o,st_inp,init_cond,data):
-	sigma = theta[-1]
-	mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
-	res = np.abs(mod_data - data)
+    sigma = theta[-1]
+    mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
+    # Calculate the difference
+    res = mod_data - data
+    # We will calculate the ssq for each vector and divide it with the norm of the data vector. This way we can
+    # then add all the individual ssqs without scaling problems
+    indi_ss = [None]*res.shape[0]
+    for i in range(0,res.shape[0]):
+        ss = np.sum(res[i,:]**2)
+        ss = ss / np.linalg.norm(data[i,:])
+        indi_ss[i] = ss
+    # We will just use the sum of all these values as our sum of square - this gives equal weight
+    ssq = np.sum(indi_ss)
 
-	## Now in res (which is a matrix), each vector (row) is a different physical qty and hence taking the norm directly dosent
-	## make sense. So we normalize each row of the matrix using L2 normalization, i,e, each eleemtn squared and summed will add to 1
-	# and then take the Frobenius norm ans use that as the sum of squares
-
-	#normalize each row to length 1
-	try:
-		res = normalize(res,norm='l2')
-	#Take the ferbinous norm of this normalized matrix
-		fab_norm = np.linalg.norm(res)
-	except ValueError:
-		print("Value Error")
-		fab_norm = 1.e100
-	# Over here we are assuming that for each output the sigma is the same - wonder how I would do this if each 
-	# column had its own sigma.....
-
-	logp = -data.shape[0] * np.log(np.sqrt(2. * np.pi) * sigma)
-	logp += (-1)*fab_norm/(2.*sigma**2)
-	return logp
+    logp = -data.shape[0] * np.log(np.sqrt(2. * np.pi) * sigma)
+    logp += (-1)*ssq/(2.*sigma**2)
+    return logp
 
 
 #This is the gradient of the likelihood - Needed for the Hamiltonian Monte Carlo (HMC) method
@@ -145,7 +140,7 @@ def main():
 
 
 	# First lets load all our data - In this case, our data is from the 14dof model - Should probably add noise to it
-	vbdata = sio.loadmat('vd_14dof_470_2.mat')
+	vbdata = sio.loadmat('vd_14dof_470.mat')
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
 	# st_inp_rad = st_inp_o*np.pi/180
@@ -184,15 +179,19 @@ def main():
 		a = 1.14
 		# b = pm.Uniform('b',lower = 0.001, upper = 5,testval = 2) # distance of c.g. from rear axle  (m)
 		b = 1.4
-		Cf = pm.Uniform('Cf',lower = -100000, upper = -40000,testval = -50000) # front axle cornering stiffness (N/rad)
-		Cr = pm.Uniform('Cr',lower = -100000, upper = -40000,testval = -50000) # rear axle cornering stiffness (N/rad)
-		Cxf = pm.Uniform('Cxf',lower = 4000, upper = 20000,testval = 5000) # front axle longitudinal stiffness (N)
-		Cxr = pm.Uniform('Cxr',lower = 4000, upper = 20000,testval = 5000) # rear axle longitudinal stiffness (N)
-		m = pm.Uniform('m',lower = 1, upper = 5000,testval = 2000)  # the mass of the vehicle (kg)
-		Iz = pm.Uniform('Iz',lower = 1, upper = 5000,testval = 1000) # yaw moment of inertia (kg.m^2)
+		Cf = pm.Uniform('Cf',lower = -100000, upper = -80000,testval = -80001) # front axle cornering stiffness (N/rad)
+		# Cr = pm.Uniform('Cr',lower = -100000, upper = -40000,testval = -50000) # rear axle cornering stiffness (N/rad)
+		Cr = pm.Deterministic("Cr",Cf) 
+		Cxf = pm.Uniform('Cxf',lower = 8000, upper = 12000,testval = 8001) # front axle longitudinal stiffness (N)
+		# Cxr = pm.Uniform('Cxr',lower = 4000, upper = 20000,testval = 5000) # rear axle longitudinal stiffness (N)
+		Cxr = pm.Deterministic("Cxr",Cxf)
+		# m = pm.Uniform('m',lower = 1, upper = 5000,testval = 2000)  # the mass of the vehicle (kg)
+		m = 1720
+		Iz = pm.Uniform('Iz',lower = 2000, upper = 2500,testval = 2100) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
-		Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
+		# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
+		Jw = 2
 
 
 		#We are also sampling our observation noise - Seems like a standard to use Half normal for this
@@ -224,7 +223,7 @@ def main():
 			trace = idata.posterior
 			# print(pm.summary(trace).to_string())
 			# print(az.summary(idata,var_names = ['a','b','Cf','Cr','Cxf','Cxr','m','Iz','Rr','Jw']).to_string())
-			print(az.summary(idata,var_names = ['Cf','Cr','Cxf','Cxr','m','Iz','Jw']).to_string())
+			print(az.summary(idata,var_names = ['Cf','Cxf','Iz']).to_string())
 			# df_sum = pm.summary(trace)
 			#Save the trace in date directory - Using the ArviZ inference data
 			idata.to_netcdf(savedir + ".nc")
