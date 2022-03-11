@@ -21,7 +21,7 @@ from vd_bi_mod import vehicle_bi
 
 def main():
 
-	vbdata = sio.loadmat('vd_8dof_4700.mat')
+	vbdata = sio.loadmat('vd_14dof_470.mat')
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
 	# st_inp_rad = st_inp_o*np.pi/180
@@ -36,12 +36,17 @@ def main():
 	##vehicle model parameters
 	a=1.14  # distance of c.g. from front axle (m)
 	b=1.4  # distance of c.g. from rear axle  (m)
-	Cf=-44000*2 # front axle cornering stiffness (N/rad)
-	Cr=-47000*2 # rear axle cornering stiffness (N/rad)
-	Cxf=5000*2 # front axle longitudinal stiffness (N)
-	Cxr=5000*2 # rear axle longitudinal stiffness (N)
+	# Cf=-81722.366 # front axle cornering stiffness (N/rad)
+	Cf = -88000
+	# Cr=-47000*2 # rear axle cornering stiffness (N/rad)
+	Cr = Cf
+	# Cxf=11756.200  # front axle longitudinal stiffness (N)
+	Cxf = 10000
+	# Cxr=5000*2 # rear axle longitudinal stiffness (N)
+	Cxr = Cxf
 	m=1720  # the mass of the vehicle (kg)
 	Iz=2420 # yaw moment of inertia (kg.m^2)
+	# Iz = 2499.813
 	Rr=0.285 # wheel radius
 	Jw=1*2  # wheel roll inertia
 
@@ -69,12 +74,12 @@ def main():
 	for i in range(0,rows):
 		### Compare the outputs with plots to validate
 		mpl.plot(time_o,data[i,:],'r',time_o,mod_data[i,:],'k')
-		mpl.title('plot 1')
+		mpl.title('Using upper limit of 95 credibility')
 		mpl.xlabel('time (s)')
 		mpl.ylabel('data[i,:]')
 		mpl.legend(['14dof','2dof'])
 		mpl.grid()
-		mpl.savefig('./images/comp.png',facecolor = 'w')
+		mpl.savefig('./images/comp_t' + str(i) + '.png',facecolor = 'w')
 		mpl.show()
 
 

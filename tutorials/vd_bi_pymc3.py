@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import sys
 import numpy as np
+import pickle
 
 
 from sklearn.preprocessing import normalize
@@ -26,23 +27,26 @@ def add_noise(a):
 
 #This is just a gaussian log likelihood - Right now our data is just a vector so its almost the same as the previous example
 def loglike(theta,time_o,st_inp,init_cond,data):
-    sigma = theta[-1]
+    sigma_vec = theta[-5:]
     mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
     # Calculate the difference
     res = mod_data - data
     # We will calculate the ssq for each vector and divide it with the norm of the data vector. This way we can
     # then add all the individual ssqs without scaling problems
-    indi_ss = [None]*res.shape[0]
+    norm_ss = [None]*res.shape[0]
     for i in range(0,res.shape[0]):
-        ss = np.sum(res[i,:]**2)
+        ss = np.sum(res[i,:]**2/(2.*sigma_vec[i]**2.))
         ss = ss / np.linalg.norm(data[i,:])
-        indi_ss[i] = ss
+        norm_ss[i] = ss
     # We will just use the sum of all these values as our sum of square - this gives equal weight
-    ssq = np.sum(indi_ss)
+    ssq = np.sum(norm_ss)
 
-    logp = -data.shape[0] * np.log(np.sqrt(2. * np.pi) * sigma)
-    logp += (-1)*ssq/(2.*sigma**2)
+    # logp = -data.shape[1] * np.log(np.sqrt(2. * np.pi) * sigma)
+    # logp += (-1)*ssq/(2.*sigma**2)
+    logp = (-1)*ssq
     return logp
+
+
 
 
 #This is the gradient of the likelihood - Needed for the Hamiltonian Monte Carlo (HMC) method
@@ -159,8 +163,7 @@ def main():
 	noOutputs= data.shape[0]
 	for i in range(noOutputs):
 		data[i,:] = add_noise(data[i,:])
-		
-
+	
 
 	#For saving all necesarry files
 	date = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -179,26 +182,29 @@ def main():
 		a = 1.14
 		# b = pm.Uniform('b',lower = 0.001, upper = 5,testval = 2) # distance of c.g. from rear axle  (m)
 		b = 1.4
-		Cf = pm.Uniform('Cf',lower = -100000, upper = -80000,testval = -80001) # front axle cornering stiffness (N/rad)
-		# Cr = pm.Uniform('Cr',lower = -100000, upper = -40000,testval = -50000) # rear axle cornering stiffness (N/rad)
-		Cr = pm.Deterministic("Cr",Cf) 
-		Cxf = pm.Uniform('Cxf',lower = 8000, upper = 12000,testval = 8001) # front axle longitudinal stiffness (N)
-		# Cxr = pm.Uniform('Cxr',lower = 4000, upper = 20000,testval = 5000) # rear axle longitudinal stiffness (N)
-		Cxr = pm.Deterministic("Cxr",Cxf)
+		Cf = pm.Uniform('Cf',lower = -100000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
+		Cr = pm.Uniform('Cr',lower = -100000, upper = -50000,testval = -65000) # rear axle cornering stiffness (N/rad)
+		# Cr = pm.Deterministic("Cr",Cf) 
+		Cxf = pm.Uniform('Cxf',lower = 5000, upper = 12000,testval = 8000) # front axle longitudinal stiffness (N)
+		Cxr = pm.Uniform('Cxr',lower = 5000, upper = 12000,testval = 8000) # rear axle longitudinal stiffness (N)
+		# Cxr = pm.Deterministic("Cxr",Cxf)
 		# m = pm.Uniform('m',lower = 1, upper = 5000,testval = 2000)  # the mass of the vehicle (kg)
 		m = 1720
-		Iz = pm.Uniform('Iz',lower = 2000, upper = 2500,testval = 2100) # yaw moment of inertia (kg.m^2)
+		Iz = pm.Uniform('Iz',lower = 1000, upper = 3000,testval = 2100) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
 		# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
 		Jw = 2
 
-
-		#We are also sampling our observation noise - Seems like a standard to use Half normal for this
-		sigma = pm.HalfNormal("sigma",sigma = 0.6,testval=0.1)
+		#We are also sampling our observation noise - Seems like a standard to use Half normal for this - Expect the same amount of precicsion so same prior
+		sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.6,testval=0.1)
+		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.6,testval=0.1)
+		sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
+		sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
+		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.6,testval=0.1)
 
 		## Convert our theta into a theano tensor
-		theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw])
+		theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVx,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
 
 		#According to this thread, we should use pm.Potential
 		#https://stackoverflow.com/questions/64267546/blackbox-likelihood-example
@@ -223,12 +229,18 @@ def main():
 			trace = idata.posterior
 			# print(pm.summary(trace).to_string())
 			# print(az.summary(idata,var_names = ['a','b','Cf','Cr','Cxf','Cxr','m','Iz','Rr','Jw']).to_string())
-			print(az.summary(idata,var_names = ['Cf','Cxf','Iz']).to_string())
+			print(az.summary(idata,var_names = ['Cf','Cxf','Iz','sigmaVx']).to_string())
 			# df_sum = pm.summary(trace)
 			#Save the trace in date directory - Using the ArviZ inference data
 			idata.to_netcdf(savedir + ".nc")
 			# pm.save_trace(directory = savedir + '_' + str(ndraws),trace=trace)
 			#Save the stats in a csv file
+			# with open('./models/'+savedir+'.pkl', 'wb') as buff:
+			# 	pickle.dump({'model': model, 'trace': idata}, buff)
+
+			# #Trying out posterior predictive
+			# post_pred = pm.sample_posterior_predictive(trace, model=model, samples=2000)
+			# print(post_pred)
 
 
 		# path = 'results/'
