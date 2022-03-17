@@ -21,7 +21,7 @@ from vd_bi_mod import vehicle_bi
 
 def main():
 
-	vbdata = sio.loadmat('vd_14dof_470.mat')
+	vbdata = sio.loadmat('vd_14dof_11000_sin.mat')
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
 	# st_inp_rad = st_inp_o*np.pi/180
@@ -35,7 +35,7 @@ def main():
 	
 	##vehicle model parameters
 	a=1.14  # distance of c.g. from front axle (m)
-	b=1.4  # distance of c.g. from rear axle  (m)
+	b=1  # distance of c.g. from rear axle  (m)
 	# Cf=-81722.366 # front axle cornering stiffness (N/rad)
 	Cf = -88000
 	# Cr=-47000*2 # rear axle cornering stiffness (N/rad)
@@ -45,7 +45,7 @@ def main():
 	# Cxr=5000*2 # rear axle longitudinal stiffness (N)
 	Cxr = Cxf
 	m=1720  # the mass of the vehicle (kg)
-	Iz=2420 # yaw moment of inertia (kg.m^2)
+	Iz=2000 # yaw moment of inertia (kg.m^2)
 	# Iz = 2499.813
 	Rr=0.285 # wheel radius
 	Jw=1*2  # wheel roll inertia
@@ -69,7 +69,7 @@ def main():
 
 
 	rows  = mod_data.shape[0]
-	mpl.style.use('plot_style.mplstyle')
+	# mpl.style.use('plot_style.mplstyle')
 	mpl.figure(1,figsize = (8,8))
 	for i in range(0,rows):
 		### Compare the outputs with plots to validate

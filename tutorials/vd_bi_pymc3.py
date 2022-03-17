@@ -10,9 +10,10 @@ from datetime import datetime
 import sys
 import numpy as np
 import pickle
+import transcript
 
 
-from sklearn.preprocessing import normalize
+# from sklearn.preprocessing import normalize
 #Import our bi vehicle model
 from vd_bi_mod import vehicle_bi
 
@@ -22,15 +23,36 @@ def scale_0_1(a):
 
 
 ## Function to add noise to generate the "fake data"
+# def add_noise(a):
+# 	return a - np.random.uniform(-a.mean()/20,a.mean()/20)   
+
+## Adding normally distributed noise at each time instant
 def add_noise(a):
-	return a - np.random.uniform(-a.mean()/20,a.mean()/20)   
+	return a - np.random.normal(loc = 0., scale = abs(a.max()/20),size = a.shape)
 
 #This is just a gaussian log likelihood - Right now our data is just a vector so its almost the same as the previous example
 def loglike(theta,time_o,st_inp,init_cond,data):
-    sigma_vec = theta[-5:]
+    sigma_vec = theta[-(data.shape[0]):]
+    # sigma_vec = theta[-1:]
     mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
+    # Discard data that is not around the manuever
+
+
+    # ## Find the index for which steering input is non zero 
+    # non_z_ind = np.where(st_inp != 0 )[0][0]
+
+    # #We will take 20 points before and 100 points after
+    # start = non_z_ind - 20
+    # end = non_z_ind + 100
+
+    # #Now we filter that data out - Taking only the lateral acceleration - if taking all- remove the reshape from all three below lines
+    # mod_data = mod_data[:,start:end]
+    # data = data[:,start:end]
+
+
     # Calculate the difference
-    res = mod_data - data
+    res = (mod_data - data)
+ 
     # We will calculate the ssq for each vector and divide it with the norm of the data vector. This way we can
     # then add all the individual ssqs without scaling problems
     norm_ss = [None]*res.shape[0]
@@ -46,8 +68,32 @@ def loglike(theta,time_o,st_inp,init_cond,data):
     logp = (-1)*ssq
     return logp
 
+# #This is just a gaussian log likelihood - This is when we onyl want to use lateral acceleration
+# def loglike(theta,time_o,st_inp,init_cond,data):
+#     sigma_vec = theta[-1:]
+#     mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
+#     # Discard data that is not around the manuever
 
 
+#     # ## Find the index for which steering input is non zero 
+#     # non_z_ind = np.where(st_inp != 0 )[0][0]
+
+#     # #We will take 20 points before and 100 points after
+#     # start = non_z_ind - 20
+#     # end = non_z_ind + 250
+
+#     # #Now we filter that data out - Taking only the lateral acceleration - if taking all- remove the reshape from all three below lines
+#     # mod_data = mod_data[-1:,start:end]
+#     # data = data[-1:,start:end]
+
+
+#     # Calculate the difference
+#     res = (data - mod_data)
+#     # print(res,res.shape)
+# #     logp = -data.shape[1] * np.log(np.sqrt(2. * np.pi) * sigma_vec[0])
+#     logp = -np.sum(res**2/(2.*sigma_vec[0]**2.))
+    
+#     return logp
 
 #This is the gradient of the likelihood - Needed for the Hamiltonian Monte Carlo (HMC) method
 def grad_loglike(theta,time_o,st_inp,init_cond,data):
@@ -58,8 +104,9 @@ def grad_loglike(theta,time_o,st_inp,init_cond,data):
 	delx = np.sqrt(np.finfo(float).eps)
 	#We are approximating the partial derivative of the log likelihood with finite difference
 	#We have to define delx for each partial derivative of loglike with theta's
-	grads = sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
-	return grads
+	# grads = sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
+
+	return sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
 
 
 #Copy paste the theano Operation class from stackoverflow - 
@@ -135,6 +182,8 @@ class LoglikeGrad(tt.Op):
 		outputs[0][0] = grads
 
 def main():
+	original_stdout = sys.stdout
+
 	# Specify number of draws as a command line argument
 	if(len(sys.argv) < 2):
 		print("Please provide the number of draws and the stepping method")
@@ -144,7 +193,8 @@ def main():
 
 
 	# First lets load all our data - In this case, our data is from the 14dof model - Should probably add noise to it
-	vbdata = sio.loadmat('vd_14dof_470.mat')
+	datafile = 'vd_14dof_1100_sin.mat'
+	vbdata = sio.loadmat(datafile)
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
 	# st_inp_rad = st_inp_o*np.pi/180
@@ -156,8 +206,9 @@ def main():
 	psi_angle_o = vbdata['psi_angle'].reshape(-1,)
 
 	#Make all these vectors into column vecctors in the matrix data
-	data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
-
+	# data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
+	# data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
+	data = np.array([lat_vel_o,lat_acc_o])
 	## Add noise to all the outputs
 
 	noOutputs= data.shape[0]
@@ -178,78 +229,83 @@ def main():
 	with pm.Model() as model:
 		# Now we declare all the thetas, we will sample everythign because we only have 10 parameters
 
-		# a = pm.Uniform('a',lower = 0.001, upper = 5,testval = 2)  # distance of c.g. from front axle (m) - Maximum length of a truck is 65 feet
-		a = 1.14
-		# b = pm.Uniform('b',lower = 0.001, upper = 5,testval = 2) # distance of c.g. from rear axle  (m)
-		b = 1.4
-		Cf = pm.Uniform('Cf',lower = -100000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
-		Cr = pm.Uniform('Cr',lower = -100000, upper = -50000,testval = -65000) # rear axle cornering stiffness (N/rad)
+		a = pm.Uniform('a',lower = 0.5, upper = 2,testval = 1.25)  # distance of c.g. from front axle (m) - Maximum length of a truck is 65 feet
+		# a = 1.14
+		b = pm.Uniform('b',lower = 0.5, upper = 1.8,testval = 1.25) # distance of c.g. from rear axle  (m)
+		# b = 1.4
+		Cf = pm.Uniform('Cf',lower = -120000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
+		Cr = pm.Uniform('Cr',lower = -120000, upper = -50000,testval = -65000) # rear axle cornering stiffness (N/rad)
+		# Cr = -88000
 		# Cr = pm.Deterministic("Cr",Cf) 
-		Cxf = pm.Uniform('Cxf',lower = 5000, upper = 12000,testval = 8000) # front axle longitudinal stiffness (N)
-		Cxr = pm.Uniform('Cxr',lower = 5000, upper = 12000,testval = 8000) # rear axle longitudinal stiffness (N)
+		# Cxf = pm.Uniform('Cxf',lower = 5000, upper = 12000,testval = 8000) # front axle longitudinal stiffness (N)
+		Cxf = 10000
+		# Cxr = pm.Uniform('Cxr',lower = 5000, upper = 12000,testval = 8000) # rear axle longitudinal stiffness (N)
+		Cxr = 10000
 		# Cxr = pm.Deterministic("Cxr",Cxf)
-		# m = pm.Uniform('m',lower = 1, upper = 5000,testval = 2000)  # the mass of the vehicle (kg)
+		# m = pm.Uniform('m',lower = 1200, upper = 1800,testval = 1700)  # the mass of the vehicle (kg)
 		m = 1720
-		Iz = pm.Uniform('Iz',lower = 1000, upper = 3000,testval = 2100) # yaw moment of inertia (kg.m^2)
+		Iz = 2420
+		# Iz = pm.Uniform('Iz',lower = 1000, upper = 3000,testval = 2100) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
 		# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
 		Jw = 2
+		
+		
+
+
 
 		#We are also sampling our observation noise - Seems like a standard to use Half normal for this - Expect the same amount of precicsion so same prior
-		sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.6,testval=0.1)
-		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.6,testval=0.1)
-		sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
-		sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
-		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.6,testval=0.1)
+		# sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.6,testval=0.1)
+		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.06,testval=0.1)
+		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
+		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
+		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
+		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.06,testval=0.05)
 
 		## Convert our theta into a theano tensor
-		theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVx,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
+		theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaLat_acc]
+		# theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
+		theta = tt.as_tensor_variable(theta_)
+
+
+
 
 		#According to this thread, we should use pm.Potential
 		#https://stackoverflow.com/questions/64267546/blackbox-likelihood-example
 		pm.Potential("like",like(theta))
 
 		#Now we sample!
-		with model:
-			#We use metropolis as the algorithm with parameters to be sampled supplied through vars
-			if(sys.argv[2] == "nuts"):
-				# step = pm.NUTS()
-				pm.sampling.init_nuts()
-				idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
-			elif(sys.argv[2] == "met"):
-				step = pm.Metropolis()
-				idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
-			else:
-				print("Please provide nuts or met as the stepping method")
-			#We provide starting values for our parameters
-			# start = pm.find_MAP()
-			
-			#Print the summary of all the parameters
-			trace = idata.posterior
-			# print(pm.summary(trace).to_string())
-			# print(az.summary(idata,var_names = ['a','b','Cf','Cr','Cxf','Cxr','m','Iz','Rr','Jw']).to_string())
-			print(az.summary(idata,var_names = ['Cf','Cxf','Iz','sigmaVx']).to_string())
-			# df_sum = pm.summary(trace)
-			#Save the trace in date directory - Using the ArviZ inference data
-			idata.to_netcdf(savedir + ".nc")
-			# pm.save_trace(directory = savedir + '_' + str(ndraws),trace=trace)
-			#Save the stats in a csv file
-			# with open('./models/'+savedir+'.pkl', 'wb') as buff:
-			# 	pickle.dump({'model': model, 'trace': idata}, buff)
-
-			# #Trying out posterior predictive
-			# post_pred = pm.sample_posterior_predictive(trace, model=model, samples=2000)
-			# print(post_pred)
+		#We use metropolis as the algorithm with parameters to be sampled supplied through vars
+		transcript.start('./results/' + savedir + '_dump.log')
+		if(sys.argv[2] == "nuts"):
+			# step = pm.NUTS()
+			pm.sampling.init_nuts()
+			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
+		elif(sys.argv[2] == "met"):
+			step = pm.Metropolis()
+			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
+		else:
+			print("Please provide nuts or met as the stepping method")
 
 
-		# path = 'results/'
-		# if(os.path.isdir(path)):
-		# 	df_sum.to_csv('./results/'+savedir+'_stats_'+str(ndraws)+'.csv')
-		# else:
-		# 	os.mkdir(path)
-		# 	df_sum.to_csv('./results/'+savedir+'_stats_'+str(ndraws)+'.csv')
+		trace = idata.posterior
 
+
+		transcript.start('./results/' + savedir + '.log')
+
+		print(f"{datafile=}")
+
+		for i in range(0,len(theta_)):
+			print(f"{theta_[i]}")
+
+		try:
+			print(az.summary(idata,var_names = ['Cf','Cr','a','b','sigmaVy','sigmaLat_acc']).to_string())
+		except KeyError:
+			idata.to_netcdf('./results/' + savedir + ".nc")
+
+		idata.to_netcdf('./results/' + savedir + ".nc")
+		transcript.stop('./results/' + savedir + '.log')
 
 if __name__ == "__main__":
 	main()
