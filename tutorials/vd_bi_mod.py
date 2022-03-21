@@ -117,8 +117,8 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 
 
 	# mod_data = np.array([Vx_,Vy_,psi_,psi_dot_,lateral_acc_])
-	# mod_data = np.array([Vy_,psi_,psi_dot_,lateral_acc_])
-	mod_data = np.array([Vy_,lateral_acc_])
+	mod_data = np.array([Vy_,psi_,psi_dot_,lateral_acc_])
+	# mod_data = np.array([Vy_,lateral_acc_])
 
 
 	return mod_data

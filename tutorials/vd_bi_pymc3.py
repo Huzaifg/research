@@ -28,13 +28,15 @@ def scale_0_1(a):
 
 ## Adding normally distributed noise at each time instant
 def add_noise(a):
-	return a - np.random.normal(loc = 0., scale = abs(a.max()/20),size = a.shape)
+	return a - np.random.normal(loc = 0., scale = abs(a.mean()/20),size = a.shape)
 
 #This is just a gaussian log likelihood - Right now our data is just a vector so its almost the same as the previous example
 def loglike(theta,time_o,st_inp,init_cond,data):
     sigma_vec = theta[-(data.shape[0]):]
-    # sigma_vec = theta[-1:]
+
     mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
+    # Using only the lateeral acceleration and the lateral veclocity
+    mod_data = mod_data[[0,3],:]
     # Discard data that is not around the manuever
 
 
@@ -67,6 +69,48 @@ def loglike(theta,time_o,st_inp,init_cond,data):
     # logp += (-1)*ssq/(2.*sigma**2)
     logp = (-1)*ssq
     return logp
+
+
+# Log like for common sigma to eleviate the pains of sampling so many sigmas
+# def loglike(theta,time_o,st_inp,init_cond,data):
+#     sigma_vec = theta[-1]
+#     # sigma_vec = theta[-1:]
+#     mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
+#     # Using only the lateeral acceleration and the lateral veclocity
+#     mod_data = mod_data[[0,3],:]
+#     # Discard data that is not around the manuever
+
+
+#     # ## Find the index for which steering input is non zero 
+#     # non_z_ind = np.where(st_inp != 0 )[0][0]
+
+#     # #We will take 20 points before and 100 points after
+#     # start = non_z_ind - 20
+#     # end = non_z_ind + 100
+
+#     # #Now we filter that data out - Taking only the lateral acceleration - if taking all- remove the reshape from all three below lines
+#     # mod_data = mod_data[:,start:end]
+#     # data = data[:,start:end]
+
+
+#     # Calculate the difference
+#     res = (mod_data - data)
+ 
+#     # We will calculate the ssq for each vector and divide it with the norm of the data vector. This way we can
+#     # then add all the individual ssqs without scaling problems
+#     norm_ss = [None]*res.shape[0]
+#     for i in range(0,res.shape[0]):
+#         ss = np.sum(res[i,:]**2)
+#         ss = ss / np.linalg.norm(data[i,:])
+#         norm_ss[i] = ss
+#     # We will just use the sum of all these values as our sum of square - this gives equal weight
+#     ssq = np.sum(norm_ss)
+
+#     # logp = -data.shape[1] * np.log(np.sqrt(2. * np.pi) * sigma)
+#     # logp += (-1)*ssq/(2.*sigma**2)
+#     logp = (-1)*ssq/(2.*sigma**2)
+#     return logp
+
 
 # #This is just a gaussian log likelihood - This is when we onyl want to use lateral acceleration
 # def loglike(theta,time_o,st_inp,init_cond,data):
@@ -193,7 +237,7 @@ def main():
 
 
 	# First lets load all our data - In this case, our data is from the 14dof model - Should probably add noise to it
-	datafile = 'vd_14dof_1100_sin.mat'
+	datafile = 'vd_14dof_470.mat'
 	vbdata = sio.loadmat(datafile)
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
@@ -229,9 +273,11 @@ def main():
 	with pm.Model() as model:
 		# Now we declare all the thetas, we will sample everythign because we only have 10 parameters
 
-		a = pm.Uniform('a',lower = 0.5, upper = 2,testval = 1.25)  # distance of c.g. from front axle (m) - Maximum length of a truck is 65 feet
+		# a = pm.Uniform('a',lower = 0.5, upper = 2,testval = 1.25)  # distance of c.g. from front axle (m) - Maximum length of a truck is 65 feet
 		# a = 1.14
-		b = pm.Uniform('b',lower = 0.5, upper = 1.8,testval = 1.25) # distance of c.g. from rear axle  (m)
+		a = pm.Normal('a',mu=1., sigma = 0.25,testval = 1.25)
+		b= pm.Normal('b',mu=1.25, sigma = 0.25,testval = 1.4)
+		# b = pm.Uniform('b',lower = 0.5, upper = 1.8,testval = 1.25) # distance of c.g. from rear axle  (m)
 		# b = 1.4
 		Cf = pm.Uniform('Cf',lower = -120000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
 		Cr = pm.Uniform('Cr',lower = -120000, upper = -50000,testval = -65000) # rear axle cornering stiffness (N/rad)
@@ -248,7 +294,7 @@ def main():
 		# Iz = pm.Uniform('Iz',lower = 1000, upper = 3000,testval = 2100) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
-		# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
+			# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
 		Jw = 2
 		
 		
@@ -257,14 +303,16 @@ def main():
 
 		#We are also sampling our observation noise - Seems like a standard to use Half normal for this - Expect the same amount of precicsion so same prior
 		# sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.6,testval=0.1)
-		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.06,testval=0.1)
+		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.06,testval=0.05)
 		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
 		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
 		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
 		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.06,testval=0.05)
+		# sigmaCom = pm.HalfNormal("sigmaCom",sigma = 0.06,testval=0.05)
 
 		## Convert our theta into a theano tensor
-		theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaLat_acc]
+		# theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaLat_acc]
+		theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaLat_acc,sigmaVy]
 		# theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
 		theta = tt.as_tensor_variable(theta_)
 
@@ -300,7 +348,7 @@ def main():
 			print(f"{theta_[i]}")
 
 		try:
-			print(az.summary(idata,var_names = ['Cf','Cr','a','b','sigmaVy','sigmaLat_acc']).to_string())
+			print(az.summary(idata,var_names = ['Cf','Cr','sigmaVy']).to_string())
 		except KeyError:
 			idata.to_netcdf('./results/' + savedir + ".nc")
 
