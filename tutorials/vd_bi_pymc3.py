@@ -274,11 +274,11 @@ def main():
 		# Now we declare all the thetas, we will sample everythign because we only have 10 parameters
 
 		# a = pm.Uniform('a',lower = 0.5, upper = 2,testval = 1.25)  # distance of c.g. from front axle (m) - Maximum length of a truck is 65 feet
-		# a = 1.14
-		a = pm.Normal('a',mu=1., sigma = 0.25,testval = 1.25)
-		b= pm.Normal('b',mu=1.25, sigma = 0.25,testval = 1.4)
+		a = 1.14
+		# a = pm.Normal('a',mu=1., sigma = 0.25,testval = 1.25)
+		# b= pm.Normal('b',mu=1.25, sigma = 0.25,testval = 1.4)
 		# b = pm.Uniform('b',lower = 0.5, upper = 1.8,testval = 1.25) # distance of c.g. from rear axle  (m)
-		# b = 1.4
+		b = 1.4
 		Cf = pm.Uniform('Cf',lower = -120000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
 		Cr = pm.Uniform('Cr',lower = -120000, upper = -50000,testval = -65000) # rear axle cornering stiffness (N/rad)
 		# Cr = -88000
@@ -288,8 +288,8 @@ def main():
 		# Cxr = pm.Uniform('Cxr',lower = 5000, upper = 12000,testval = 8000) # rear axle longitudinal stiffness (N)
 		Cxr = 10000
 		# Cxr = pm.Deterministic("Cxr",Cxf)
-		# m = pm.Uniform('m',lower = 1200, upper = 1800,testval = 1700)  # the mass of the vehicle (kg)
-		m = 1720
+		m = pm.Uniform('m',lower = 1200, upper = 1800,testval = 1700)  # the mass of the vehicle (kg)
+		# m = 1720
 		Iz = 2420
 		# Iz = pm.Uniform('Iz',lower = 1000, upper = 3000,testval = 2100) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
@@ -329,7 +329,7 @@ def main():
 		if(sys.argv[2] == "nuts"):
 			# step = pm.NUTS()
 			pm.sampling.init_nuts()
-			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
+			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=2)
 		elif(sys.argv[2] == "met"):
 			step = pm.Metropolis()
 			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)

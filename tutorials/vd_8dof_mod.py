@@ -59,7 +59,7 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
     Cr=theta[17]   #rear tire cornering stiffness (N/rad)
     Cxf=theta[18]   #front tire longitudinal stiffness (N)
     Cxr=theta[19]   #rear tire longitudinal stiffness (N)
-    r0=theta[20]   #nominal tire radius (m)
+    r0=theta[20]   #nominal tire radius (m)s
     hrcf=theta[21]   #front roll center distance below sprung mass c.g.
     hrcr=theta[22]    #rear roll center distance below sprung mass c.g.
     krof=theta[23]   #front roll stiffness (Nm/rad)
@@ -109,7 +109,15 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
     delta4 = st_input
 
     long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay = (np.zeros(Tsim) for _ in range(8))
-
+    
+    #For the first time step
+    long_vel[0] = u
+    long_acc[0] = u_dot
+    roll_angle[0] = phi
+    lat_acc[0] = v_dot
+    lat_vel[0] = v
+    psi_angle[0] = psi
+    yaw_rate[0] = dpsi
 
 
     ### Run the simulation - scary equations 
@@ -241,7 +249,8 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
         ay[ind]=u*wz+v_dot
 
     #For now lets just return one of the vectors, we will first work on just using one of the outputs for the bayesian inference
-    mod_data = np.array([long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay])
+    # mod_data = np.array([long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay])
+    mod_data = np.array([roll_angle,ay,yaw_rate,lat_vel,psi_angle,long_vel])
     return mod_data
 
 
