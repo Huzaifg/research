@@ -11,7 +11,7 @@ from datetime import datetime
 import sys
 from math import atan,cos,sin
 from vd_bi_mod import vehicle_bi
-
+from vd_8dof_mod import vehicle_8dof
 
 
 """
@@ -19,9 +19,9 @@ Requires the following command line inputs
 
 mod_data_dof : The dof of the model which was fitted (used as black box in mcmc)
 filename : The filename of the inference data file generated after mcmc. DO NOT prepend the results subdirectory or the file extension
-save : True/False - Whether the plots need to be saved to ./images
 data_dof - The dof of the data model that this fit is being compared to
 dataFileName - The .mat file that the fit is being comparaed to - Over here DO append the file extension .mat
+save : True/False - Whether the plots need to be saved to ./images
 
 
 Returns : 
@@ -90,23 +90,86 @@ def main():
 
 	##vehicle model parameters
 	try:
-		a=idata.posterior.mean()['a'] # distance of c.g. from front axle (m)
-		b=idata.posterior.mean()['b']  # distance of c.g. from rear axle  (m)
-		Cf = idata.posterior.mean()['Cf']
-		Cr = idata.posterior.mean()['Cr']
-		Cxf = 10000
-		Cxr = 10000
-		m=1720  # the mass of the vehicle (kg)
-		Iz=2420 # yaw moment of inertia (kg.m^2)
-		Rr=0.285 # wheel radius
-		Jw=1*2  # wheel roll inertia
-		sigmaLat_acc = 0.38
+	    if(mod_data_dof[0] == '2'):
+	        a=idata.posterior.mean()['a'] # distance of c.g. from front axle (m)
+	        b=idata.posterior.mean()['b']  # distance of c.g. from rear axle  (m)
+	        Cf = idata.posterior.mean()['Cf']
+	        Cr = idata.posterior.mean()['Cr']
+	        Cxf = 10000
+	        Cxr = 10000
+	        m=1720  # the mass of the vehicle (kg)
+	        Iz=2420 # yaw moment of inertia (kg.m^2)
+	        Rr=0.285 # wheel radius
+	        Jw=1*2  # wheel roll inertia
+	        sigmaLat_acc = 0.38
+	        theta = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw]
+	        init_cond = { 'Vy' : 0, 'Vx' : 50./3.6 , 'psi' : 0, 'psi_dot' : 0, 'Y' : 0, 'X' : 0}
+	    elif(mod_data_dof[0] == '8'):
+	        mass = 1400
+	        # Sprung mass roll inertia (kg.m^2)
+	        Jx = 900  # Sprung mass roll inertia (kg.m^2)
+	        # Sprung mass pitch inertia (kg.m^2)
+	        Jy  = 2000
+	        # Sprung mass yaw inertia (kg.m^2)
+	        Jz = 2420
+	        # Distance of sprung mass c.g. from front axle (m)
+	        a = 1.14
+	        # Distance of sprung mass c.g. from rear axle (m)
+	        b = 1.4
+	        # Sprung mass XZ product of inertia
+	        Jxz = 90
+	        #tire/wheel roll inertia kg.m^2
+	        Jw = 1
+	        # acceleration of gravity
+	        g = 9.8
+	        # Sprung mass c.g. height (m)
+	        h = 0.75
+	        # front track width (m)
+	        cf = 1.5
+	        # rear track width (m)
+	        cr = 1.5
+	        #front unsprung mass (kg)
+	        muf = 80
+	        #rear unsprung mass (kg)
+	        mur = 80
+	        #front tire stiffness (N/m) - Over here we are assuming that all the tires are identical to reduce the number of parameters
+	        ktf = 200000
+	        #rear tire stiffness (N/m) - Since rear tire is identical to front tire, we supply it as a deterministic variable
+	        ktr = 200000
+	        #front tire cornering stiffness (N/rad) - Over here we are assuming that all the tires are identical to reduce the number of parameters
+	        Cf = idata.posterior.mean()['Cf']
+	        #rear tire stiffness (N/m) - Since rear tire is identical to front tire, we supply it as a deterministic variable
+	        Cr = idata.posterior.mean()['Cr']
+	        #front tire longitudinal stiffness (N)
+	        Cxf = 5000
+	        #rear tire longitudinal stiffness (N) - Same as front tire
+	        Cxr = 5000
+	        #nominal tire radius (m) - Easily measurable so not sampled
+	        r0 = 0.285
+	        #front roll center distance below sprung mass c.g.
+	        hrcf = 0.65
+	        #rear roll center distance below sprung mass c.g.
+	        hrcr = 0.6
+	        #front roll stiffness (Nm/rad)
+	        krof = 29000
+	        #rear roll stiffness (Nm/rad)
+	        kror = 29000
+	        #front roll damping coefficient (Nm.s/rad)
+	        brof = 3000
+	        #rear roll damping coefficient (Nm.s/rad)
+	        bror = 3000
+	        theta = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror]
+	        init_cond = { 'u' : 50./3.6, 'v' : 0 , 'u_dot' : 0, 'v_dot' : 0, 'phi' : 0, 'psi' : 0, 'dphi' : 0, 'dpsi' : 0, 'wx' : 0, 'wy' : 0,
+	'wz' : 0, 'wx_dot' : 0, 'wz_dot' : 0 }
+	        
 	except KeyError:
-		print("Probably some parameters you thought is sampled is not sampled")
-		raise KeyError
+	        print("Probably some parameters you thought is sampled is not sampled")
+	        raise KeyError
 
-	theta = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw]
-	init_cond = { 'Vy' : 0, 'Vx' : 50./3.6 , 'psi' : 0, 'psi_dot' : 0, 'Y' : 0, 'X' : 0}
+
+
+
+
 
 	vbdata = sio.loadmat(dataFileName)
 
@@ -118,16 +181,27 @@ def main():
 	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
 	psi_angle_o = vbdata['psi_angle'].reshape(-1,)
 
+
+
+
 	data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
-	
+
+
+
 	# Add all the noise
 	noOutputs= data.shape[0]
 	for i in range(noOutputs):
-		data[i,:] = add_noise(data[i,:])
+	    data[i,:] = add_noise(data[i,:])
 
 
 	# The prediction
-	mod_data = vehicle_bi(theta,time_o,st_inp_o,init_cond)
+	if(mod_data_dof[0] == '2'):
+	    mod_data = vehicle_bi(theta,time_o,st_inp_o,init_cond)
+	elif(mod_data_dof[0] == '8'):
+	    mod_data = vehicle_8dof(theta,time_o,st_inp_o,init_cond)
+
+
+
 	plot_comp_plots(time_o,data,mod_data,title,units,mod_data_dof,data_dof,savedir,save)
 	if(save):
 		print("Voila! File written to ./images")
