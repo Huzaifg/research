@@ -81,14 +81,21 @@ def main():
 	mpl.show()
 
 
-
-	print(f"Mean Acceptance rate {np.mean(idata['sample_stats']['acceptance_rate'])}")
-	print(f"Mean Tree Depth {np.mean(idata['sample_stats']['tree_depth'])}")
-	print(f"Mean Step size {np.mean(idata['sample_stats']['step_size'])}")
-	divergences = np.sum([idata['sample_stats']['diverging'][:] == True])
-	percent = (divergences)/ idata['sample_stats']['diverging'].shape[1]
-	print(f"The number of divergences is {divergences}")
-	print(f"The percentage of divergences is {round(percent,5)}")
+	try:
+		print(f"Sampling time in hours {round(idata.sample_stats.sampling_time/3600,2)}")
+		print(f"The number of draws are {idata.posterior.draw.shape[0]}")
+		print(f"The Bulk relative effective sample size is {az.ess(idata,relative = True)}")
+		print(f"The Bulk Effective samples per second is {az.ess(idata)/idata.sample_stats.sampling_time}")	
+		print(f"Mean Acceptance rate {np.mean(idata['sample_stats']['acceptance_rate'])}")
+		print(f"Mean Tree Depth {np.mean(idata['sample_stats']['tree_depth'])}")
+		print(f"Mean Step size {np.mean(idata['sample_stats']['step_size'])}")
+		divergences = np.sum([idata['sample_stats']['diverging'][:] == True])
+		percent = (divergences)/ idata['sample_stats']['diverging'].shape[1]
+		print(f"The number of divergences is {divergences}")
+		print(f"The percentage of divergences is {round(percent,5)}")
+	except:
+		print("You probably ran Metropolis and not NUTS")
+		return
 
 
 
