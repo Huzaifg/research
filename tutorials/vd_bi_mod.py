@@ -33,16 +33,26 @@ def vehicle_bi(theta,tt,st_input,init_cond):
 
 	### Our model parameters - This time they are much more simple and there is no integration so hoepfully, no overflow errors
 	
-	a=theta[0]  # distance of c.g. from front axle (m)
-	b=theta[1]  # distance of c.g. from rear axle  (m)
-	Cf=theta[2] # front axle cornering stiffness (N/rad)
-	Cr=theta[3] # rear axle cornering stiffness (N/rad)
-	Cxf=theta[4] # front axle longitudinal stiffness (N)
-	Cxr=theta[5] # rear axle longitudinal stiffness (N)
-	m=theta[6]  # the mass of the vehicle (kg)
-	Iz=theta[7] # yaw moment of inertia (kg.m^2)
-	Rr=theta[8] # wheel radius
-	Jw=theta[9] # wheel roll inertia
+	# a=theta[0]  # distance of c.g. from front axle (m)
+	# b=theta[1]  # distance of c.g. from rear axle  (m)
+	# Cf=theta[2] # front axle cornering stiffness (N/rad)
+	# Cr=theta[3] # rear axle cornering stiffness (N/rad)
+	# Cxf=theta[4] # front axle longitudinal stiffness (N)
+	# Cxr=theta[5] # rear axle longitudinal stiffness (N)
+	# m=theta[6]  # the mass of the vehicle (kg)
+	# Iz=theta[7] # yaw moment of inertia (kg.m^2)
+	# Rr=theta[8] # wheel radius
+	# Jw=theta[9] # wheel roll inertia
+	a=1.14 # distance of c.g. from front axle (m)
+	b=1.4  # distance of c.g. from rear axle  (m)
+	Cf=theta[0] # front axle cornering stiffness (N/rad)
+	Cr=theta[1] # rear axle cornering stiffness (N/rad)
+	Cxf=10000 # front axle longitudinal stiffness (N)
+	Cxr=10000 # rear axle longitudinal stiffness (N)
+	m=1720  # the mass of the vehicle (kg)
+	Iz=theta[2] # yaw moment of inertia (kg.m^2)
+	Rr=0.285 # wheel radius
+	Jw=1*2  # wheel roll inertia
 
 
 	# Supplied Initial Conditions

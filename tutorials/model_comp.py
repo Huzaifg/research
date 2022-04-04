@@ -30,6 +30,10 @@ If save is true, then the plots will also be saved in the ./images subdirectory
 """
 
 #The noise function
+#Different for long velocity as its at such a different scale and the velocity itself drops so slowly
+def long_vel_noise(a):
+	return a - np.random.normal(loc = 0., scale = abs(a.mean()/200),size = a.shape)
+
 def add_noise(a):
 	return a - np.random.normal(loc = 0., scale = abs(a.max()/20),size = a.shape) 
 
@@ -44,7 +48,8 @@ def plot_comp_plots(time_o,data,mod_data,title,units,mod_data_dof,data_dof,saved
 			mpl.title(title[i],fontsize = 20)
 			mpl.xlabel('Time (S)',fontsize = 12)
 			mpl.ylabel(title[i] + ' ' + units[i],fontsize = 12)
-			mpl.legend(['Noisy Data from ' + data_dof + ' model','Mean posterior fit with ' + mod_data_dof + ' model'],fontsize = 14)
+			# mpl.legend(['Noisy Data from ' + data_dof + ' model','Mean posterior fit with ' + mod_data_dof + ' model'],fontsize = 14)
+			mpl.legend(['Noisy Data from ' + data_dof + ' model','with mean posterior fit ' + mod_data_dof + ' model'],fontsize = 14)
 			path = 'images/'
 			if(os.path.isdir(path)):
 				if(save):
@@ -73,8 +78,8 @@ def main():
 	save = sys.argv[5].lower() == 'true'
 	data_dof = sys.argv[3]
 	# The vector of data to plot which will be used as the title
-	title = ['Lateral Velocity','Yaw Angle','Yaw Rate','Lateral Acceleration']
-	units = ['(m/s)','(rad)','(rad/s)','(m/s^2)']
+	title = ['Longitudual Velocity','Lateral Velocity','Yaw Angle','Yaw Rate','Lateral Acceleration']
+	units = ['(m/s)','(m/s)','(rad)','(rad/s)','(m/s^2)']
 
 	# The data reading and formating
 	dataFileName = sys.argv[4]
@@ -91,18 +96,24 @@ def main():
 	##vehicle model parameters
 	try:
 	    if(mod_data_dof[0] == '2'):
-	        a=idata.posterior.mean()['a'] # distance of c.g. from front axle (m)
-	        b=idata.posterior.mean()['b']  # distance of c.g. from rear axle  (m)
+	        a=1.14 # distance of c.g. from front axle (m)
+	        b=1.4  # distance of c.g. from rear axle  (m)
 	        Cf = idata.posterior.mean()['Cf']
+	        # Cf = -88000
 	        Cr = idata.posterior.mean()['Cr']
+	        # Cr = -88000
 	        Cxf = 10000
+	        # Cxf = idata.posterior.mean()['Cxf']
 	        Cxr = 10000
-	        m=1720  # the mass of the vehicle (kg)
-	        Iz=2420 # yaw moment of inertia (kg.m^2)
+	        # Cxr = idata.posterior.mean()['Cxr']
+	        # m=idata.posterior.mean()['m']  # the mass of the vehicle (kg)
+	        m = idata.posterior.mean()['m']
+	        # m = idata.posterior.mean()['m']
+	        Iz=idata.posterior.mean()['Iz'] # yaw moment of inertia (kg.m^2)
 	        Rr=0.285 # wheel radius
 	        Jw=1*2  # wheel roll inertia
-	        sigmaLat_acc = 0.38
-	        theta = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw]
+	        # theta = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw]
+	        theta = [Cf,Cr,m,Iz]
 	        init_cond = { 'Vy' : 0, 'Vx' : 50./3.6 , 'psi' : 0, 'psi_dot' : 0, 'Y' : 0, 'X' : 0}
 	    elif(mod_data_dof[0] == '8'):
 	        mass = 1400
@@ -158,7 +169,8 @@ def main():
 	        brof = 3000
 	        #rear roll damping coefficient (Nm.s/rad)
 	        bror = 3000
-	        theta = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror]
+	        # theta = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror]
+	        theta = [Cf,Cr]
 	        init_cond = { 'u' : 50./3.6, 'v' : 0 , 'u_dot' : 0, 'v_dot' : 0, 'phi' : 0, 'psi' : 0, 'dphi' : 0, 'dpsi' : 0, 'wx' : 0, 'wy' : 0,
 	'wz' : 0, 'wx_dot' : 0, 'wz_dot' : 0 }
 	        
@@ -178,20 +190,24 @@ def main():
 	# st_inp_rad = st_inp_o*np.pi/180a
 	lat_acc_o = vbdata['ay1'].reshape(-1,)
 	lat_vel_o = vbdata['lat_vel'].reshape(-1,)
+	long_vel_o = vbdata['long_vel'].reshape(-1,)
 	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
 	psi_angle_o = vbdata['psi_angle'].reshape(-1,)
 
 
 
 
-	data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
+	data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
 
 
 
 	# Add all the noise
 	noOutputs= data.shape[0]
 	for i in range(noOutputs):
-	    data[i,:] = add_noise(data[i,:])
+		if(i == 0):
+			data[i,:] = long_vel_noise(data[i,:])
+		else:
+			data[i,:] = add_noise(data[i,:])
 
 
 	# The prediction

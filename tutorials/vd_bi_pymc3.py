@@ -26,6 +26,8 @@ def scale_0_1(a):
 # def add_noise(a):
 # 	return a - np.random.uniform(-a.mean()/20,a.mean()/20)   
 
+def long_vel_noise(a):
+	return a - np.random.normal(loc = 0., scale = abs(a.mean()/200),size = a.shape)
 ## Adding normally distributed noise at each time instant
 def add_noise(a):
 	return a - np.random.normal(loc = 0., scale = abs(a.mean()/20),size = a.shape)
@@ -57,13 +59,17 @@ def loglike(theta,time_o,st_inp,init_cond,data):
  
     # We will calculate the ssq for each vector and divide it with the norm of the data vector. This way we can
     # then add all the individual ssqs without scaling problems
+    # To prevent divide by zero error in ss as sigma can be 0
+    eps = np.finfo(float).eps
     norm_ss = [None]*res.shape[0]
     for i in range(0,res.shape[0]):
-        ss = np.sum(res[i,:]**2/(2.*sigma_vec[i]**2.))
+        ss = np.sum(res[i,:]**2/(2.*(sigma_vec[i] + eps)**2.))
         ss = ss / np.linalg.norm(data[i,:])
         norm_ss[i] = ss
     # We will just use the sum of all these values as our sum of square - this gives equal weight
     ssq = np.sum(norm_ss)
+    #Adding twice the ss for lat velocity
+    # ssq = norm_ss[0] * 2 + norm_ss[1]
 
     # logp = -data.shape[1] * np.log(np.sqrt(2. * np.pi) * sigma)
     # logp += (-1)*ssq/(2.*sigma**2)
@@ -145,12 +151,16 @@ def grad_loglike(theta,time_o,st_inp,init_cond,data):
 		return loglike(theta,time_o,st_inp,init_cond,data)
 	
 	#We are not doing finite difference approximation and we define delx as the finite precision 
+	# l = len(theta)
+	# delxs = [0] * l
 	delx = np.sqrt(np.finfo(float).eps)
+	# delxs = delx * np.sqrt(np.abs(theta))
 	#We are approximating the partial derivative of the log likelihood with finite difference
 	#We have to define delx for each partial derivative of loglike with theta's
 	# grads = sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
 
 	return sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
+	# return sp.optimize.approx_fprime(theta,ll,delxs,time_o,st_inp,init_cond,data)
 
 
 #Copy paste the theano Operation class from stackoverflow - 
@@ -253,8 +263,10 @@ def main():
 	# data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
 	# data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
 	data = np.array([lat_vel_o,lat_acc_o])
+	# data = np.array([lat_vel_o])
 	## Add noise to all the outputs
 
+	# Add all the noise
 	noOutputs= data.shape[0]
 	for i in range(noOutputs):
 		data[i,:] = add_noise(data[i,:])
@@ -279,19 +291,32 @@ def main():
 		# b= pm.Normal('b',mu=1.25, sigma = 0.25,testval = 1.4)
 		# b = pm.Uniform('b',lower = 0.5, upper = 1.8,testval = 1.25) # distance of c.g. from rear axle  (m)
 		b = 1.4
-		Cf = pm.Uniform('Cf',lower = -120000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
-		Cr = pm.Uniform('Cr',lower = -120000, upper = -50000,testval = -65000) # rear axle cornering stiffness (N/rad)
+		Cf = pm.Uniform('Cf',lower = -150000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
+		# Cf = pm.Uniform('Cf',lower = -1.3, upper = -0.6, testval = -0.7)
+		# Cf = pm.TruncatedNormal('Cf',mu = -80000.,sigma = 40000,upper = -10000,lower = -10**6,testval = -100000)
+		Cr = pm.Uniform('Cr',lower = -150000, upper = -50000,testval = -80000) # rear axle cornering stiffness (N/rad)
+		# Cr = pm.Uniform('Cr',lower = -1.3, upper = -0.6, testval = -0.7)
+		# Cr = pm.TruncatedNormal('Cr',mu = -80000.,sigma = 40000,upper = -10000,lower = -10**6,testval = -100000)
 		# Cr = -88000
 		# Cr = pm.Deterministic("Cr",Cf) 
-		# Cxf = pm.Uniform('Cxf',lower = 5000, upper = 12000,testval = 8000) # front axle longitudinal stiffness (N)
-		Cxf = 10000
-		# Cxr = pm.Uniform('Cxr',lower = 5000, upper = 12000,testval = 8000) # rear axle longitudinal stiffness (N)
-		Cxr = 10000
+		# Cxf = pm.Uniform('Cxf',lower = 3000, upper = 14000,testval = 8000) # front axle longitudinal stiffness (N)
+		# Cxf = pm.TruncatedNormal('Cxf',mu = 9000, sigma = 5000, lower = 1000)
+		# Cxf = pm.Normal('Cxf', mu = 9000. , sigma = 5000, testval = 8000)
+		# Cxf = 10000
+		# Cxr = pm.Uniform('Cxr',lower = 3000, upper = 14000,testval = 8000) # rear axle longitudinal stiffness (N)
+		# Cxr = pm.Normal('Cxr', mu = 9000. , sigma = 5000, testval = 8000)
+		# Cxr = pm.TruncatedNormal('Cxr',mu = 9000, sigma = 5000, lower = 1000)
+		# Cxr = 10000
 		# Cxr = pm.Deterministic("Cxr",Cxf)
-		m = pm.Uniform('m',lower = 1200, upper = 1800,testval = 1700)  # the mass of the vehicle (kg)
+		# Non centred mass implementation
+		# m_ = pm.Normal('m_',mu = 0., sigma = 1.,testval = 0.5)  # the mass of the vehicle (kg)
+		# m = pm.Deterministic('m', 1600 + m_ * 300)
+		# m = pm.TruncatedNormal('m',mu = 1300., sigma = 600.,lower = 100,upper = 3500,testval = 1400)
+		# m = pm.Uniform('m',lower = 500, upper = 3500, testval = 1400)
 		# m = 1720
-		Iz = 2420
-		# Iz = pm.Uniform('Iz',lower = 1000, upper = 3000,testval = 2100) # yaw moment of inertia (kg.m^2)
+		# Iz = 2420
+		# Iz = pm.TruncatedNormal('Iz',mu = 2000, sigma = 1000, lower = 300,upper = 3500,testval= 2450)
+		Iz = pm.Uniform('Iz',lower = 500, upper = 3000,testval = 2450) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
 			# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
@@ -302,17 +327,19 @@ def main():
 
 
 		#We are also sampling our observation noise - Seems like a standard to use Half normal for this - Expect the same amount of precicsion so same prior
-		# sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.6,testval=0.1)
-		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.06,testval=0.05)
+		# sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.14,testval=0.1)
+		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.006,testval=0.005)
 		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
 		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
 		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
-		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.06,testval=0.05)
+		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.3,testval=0.3)
 		# sigmaCom = pm.HalfNormal("sigmaCom",sigma = 0.06,testval=0.05)
 
 		## Convert our theta into a theano tensor
 		# theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaLat_acc]
-		theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaLat_acc,sigmaVy]
+		# theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,m_,sigmaLat_acc,sigmaVy]
+		theta_ = [Cf,Cr,Iz,sigmaVy,sigmaLat_acc]
+		# theta_ = [Cf,Cr,m,sigmaVy]
 		# theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
 		theta = tt.as_tensor_variable(theta_)
 
@@ -328,11 +355,11 @@ def main():
 		transcript.start('./results/' + savedir + '_dump.log')
 		if(sys.argv[2] == "nuts"):
 			# step = pm.NUTS()
-			pm.sampling.init_nuts()
-			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=2)
+			
+			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
 		elif(sys.argv[2] == "met"):
 			step = pm.Metropolis()
-			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
+			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=4)
 		else:
 			print("Please provide nuts or met as the stepping method")
 
@@ -348,7 +375,7 @@ def main():
 			print(f"{theta_[i]}")
 
 		try:
-			print(az.summary(idata,var_names = ['Cf','Cr','sigmaVy']).to_string())
+			print(az.summary(idata).to_string())
 		except KeyError:
 			idata.to_netcdf('./results/' + savedir + ".nc")
 
