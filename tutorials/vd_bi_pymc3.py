@@ -1,8 +1,10 @@
 import scipy.io as sio
 import scipy as sp
 import matplotlib.pyplot as mpl
-import theano.tensor as tt
-import pymc3 as pm
+import aesara
+import aesara.tensor as at
+# import theano.tensor as tt
+import pymc as pm
 import arviz as az
 import pandas as pd
 import os
@@ -167,7 +169,7 @@ def grad_loglike(theta,time_o,st_inp,init_cond,data):
 #https://stackoverflow.com/questions/41109292/solving-odes-in-pymc3
 
 # define a theano Op for our likelihood function
-class LogLike(tt.Op):
+class LogLike(at.Op):
 
 	"""
 	Specify what type of object will be passed and returned to the Op when it is
@@ -175,8 +177,8 @@ class LogLike(tt.Op):
 	that define our model) and returning a single "scalar" value (the
 	log-likelihood)
 	"""
-	itypes = [tt.dvector] # expects a vector of parameter values when called
-	otypes = [tt.dscalar] # outputs a single scalar value (the log likelihood)
+	itypes = [at.dvector] # expects a vector of parameter values when called
+	otypes = [at.dscalar] # outputs a single scalar value (the log likelihood)
 
 	def __init__(self, loglike,time_o,st_inp,init_cond,data):
 		"""
@@ -219,9 +221,9 @@ class LogLike(tt.Op):
 		
 		
 #Similarly wrapper class for loglike gradient
-class LoglikeGrad(tt.Op):
-	itypes = [tt.dvector]
-	otypes = [tt.dvector]
+class LoglikeGrad(at.Op):
+	itypes = [at.dvector]
+	otypes = [at.dvector]
 
 	def __init__(self,time_o,st_inp,init_cond,data):
 		self.der_likelihood = grad_loglike
@@ -291,10 +293,10 @@ def main():
 		# b= pm.Normal('b',mu=1.25, sigma = 0.25,testval = 1.4)
 		# b = pm.Uniform('b',lower = 0.5, upper = 1.8,testval = 1.25) # distance of c.g. from rear axle  (m)
 		b = 1.4
-		Cf = pm.Uniform('Cf',lower = -150000, upper = -50000,testval = -80000) # front axle cornering stiffness (N/rad)
+		Cf = pm.Uniform('Cf',lower = -150000, upper = -50000,initval = -80000) # front axle cornering stiffness (N/rad)
 		# Cf = pm.Uniform('Cf',lower = -1.3, upper = -0.6, testval = -0.7)
 		# Cf = pm.TruncatedNormal('Cf',mu = -80000.,sigma = 40000,upper = -10000,lower = -10**6,testval = -100000)
-		Cr = pm.Uniform('Cr',lower = -150000, upper = -50000,testval = -80000) # rear axle cornering stiffness (N/rad)
+		Cr = pm.Uniform('Cr',lower = -150000, upper = -50000,initval = -80000) # rear axle cornering stiffness (N/rad)
 		# Cr = pm.Uniform('Cr',lower = -1.3, upper = -0.6, testval = -0.7)
 		# Cr = pm.TruncatedNormal('Cr',mu = -80000.,sigma = 40000,upper = -10000,lower = -10**6,testval = -100000)
 		# Cr = -88000
@@ -316,7 +318,7 @@ def main():
 		# m = 1720
 		# Iz = 2420
 		# Iz = pm.TruncatedNormal('Iz',mu = 2000, sigma = 1000, lower = 300,upper = 3500,testval= 2450)
-		Iz = pm.Uniform('Iz',lower = 500, upper = 3000,testval = 2450) # yaw moment of inertia (kg.m^2)
+		Iz = pm.Uniform('Iz',lower = 500, upper = 3000,initval = 2450) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
 			# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
@@ -328,11 +330,11 @@ def main():
 
 		#We are also sampling our observation noise - Seems like a standard to use Half normal for this - Expect the same amount of precicsion so same prior
 		# sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.14,testval=0.1)
-		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.006,testval=0.005)
+		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.006,initval=0.005)
 		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
 		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
 		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
-		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.3,testval=0.3)
+		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.3,initval=0.3)
 		# sigmaCom = pm.HalfNormal("sigmaCom",sigma = 0.06,testval=0.05)
 
 		## Convert our theta into a theano tensor
@@ -341,7 +343,7 @@ def main():
 		theta_ = [Cf,Cr,Iz,sigmaVy,sigmaLat_acc]
 		# theta_ = [Cf,Cr,m,sigmaVy]
 		# theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
-		theta = tt.as_tensor_variable(theta_)
+		theta = at.as_tensor_variable(theta_)
 
 
 
