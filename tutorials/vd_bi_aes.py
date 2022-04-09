@@ -18,6 +18,7 @@ from jax import grad,vmap,jit
 from jax.test_util import check_grads
 from jax.experimental.ode import odeint
 import pymc.sampling_jax
+from aesara.graph import Apply, Op
 
 
 #Fake noise function for data
@@ -36,64 +37,71 @@ def loglike(theta,state,time,targets):
 	return -jnp.sum(jnp.sum((mod[:,[0,2]] - targets)**2/(2.*sigmas**2))/jnp.linalg.norm(targets,axis = 0))
 
 
-@jit
-def grad_loglike(theta,state,time,target):
-	#calclate the gradient using jax
-	return grad(loglike)(jnp.array(theta,float),state,time,target)
 
+#Gradient of loglikelihood function
+grad_loglike = jit(grad(loglike,argnums=list(range(4))))
 
 
 
 # define a custom aesera operation
 class LogLike(at.Op):
 
-	itypes = [at.dvector] # expects a vector of parameter values when called
-	otypes = [at.dscalar] # outputs a single scalar value (the log likelihood)
+	def make_node(self, *inputs):
+		# Convert our inputs to symbolic variables
+		inputs = [at.as_tensor_variable(inp) for inp in inputs]
+		# Define the type of the output returned by the wrapped JAX function
+		outputs = [at.dscalar()]
+		return Apply(self, inputs, outputs)
 
-	def __init__(self, loglike,state,time,target):
-		# add inputs as class attributes
-		self.likelihood = loglike
-		self.state = state #Initial conditions
-		self.time = time #time steps we want to evaluate the ODE
-		self.target = target #data
-		self.loglike_grad = LoglikeGrad(self.state,self.time,self.target)
+	# def __init__(self, loglike,state,time,target):
+	# 	# add inputs as class attributes
+	# 	self.likelihood = loglike
+	# 	self.state = state #Initial conditions
+	# 	self.time = time #time steps we want to evaluate the ODE
+	# 	self.target = target #data
+	# 	self.loglike_grad = LoglikeGrad(self.state,self.time,self.target)
 
 	def perform(self, node, inputs, outputs):
-		# the method that is used when calling the Op
-		theta, = inputs  # this will contain my variables
+		result = loglike(*inputs)
+		# Aesara raises an error if the dtype of the returned output is not
+		# exactly the one expected from the Apply node (in this case
+		# `dscalar`, which stands for float64 scalar), so we make sure
+		# to convert to the expected dtype. To avoid unecessary conversions
+		# you should make sure the expected output defined in `make_node`
+		# is already of the correct dtype
+		outputs[0][0] = np.asarray(result, dtype=node.outputs[0].dtype)
 
-		# call the log-likelihood function
-		logp = self.likelihood(theta,self.state,self.time,self.target)
-
-		outputs[0][0] = np.array(logp) # output the log-likelihood
-	def grad(self,inputs,grad_outputs):
-		theta, = inputs
-		grads = self.loglike_grad(theta)
-		return [grad_outputs[0] * grads]
+	def grad(self, inputs, output_gradients):
+		gradients = logprob_grad_op(*inputs)
+		return [output_gradients[0] * gradient for gradient in gradients]
 
 
 #Similarly wrapper class for loglike gradient
 class LoglikeGrad(at.Op):
-	itypes = [at.dvector]
-	otypes = [at.dvector]
 
-	def __init__(self,state,time,target):
-		self.der_likelihood = grad_loglike
-		self.state = state
-		self.time = time
-		self.target = target
-
+	def make_node(self, *inputs):
+		inputs = [at.as_tensor_variable(inp) for inp in inputs]
+		# This `Op` wil return one gradient per input. For simplicity, we assume
+		# each output is of the same type as the input. In practice, you should use
+		# the exact dtype to avoid overhead when saving the results of the computation
+		# in `perform`
+		outputs = [inp.type() for inp in inputs]
+		return Apply(self, inputs, outputs)
 
 	def perform(self, node, inputs, outputs):
-		(theta,) = inputs
-		grads = self.der_likelihood(theta,self.state,self.time,self.target)
-		outputs[0][0] = grads
+		# If there are inputs for which the gradients will never be needed or cannot
+		# be computed, `aesara.gradient.grad_not_implemented` should  be used
+		results = grad_loglike(*inputs)
+		for i, result in enumerate(results):
+			outputs[i][0] = np.asarray(result, dtype=node.outputs[i].dtype)
+
+# Initialize our `Op`s
+logp_op = LogLike()
+logprob_grad_op = LoglikeGrad()
 
 
 
 def main():
-	original_stdout = sys.stdout
-
 	# Specify number of draws as a command line argument
 	if(len(sys.argv) < 2):
 		print("Please provide the number of draws and the stepping method")
@@ -102,19 +110,21 @@ def main():
 	nburn = int(ndraws/2)
 
 
-	# Get the target data
+
+
 	datafile = 'vd_14dof_470.mat'
 	vbdata = sio.loadmat(datafile)
 	lat_vel_o = vbdata['lat_vel'].reshape(-1,)
 	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
-	time_o = jnp.asarray(vbdata['tDash'].reshape(-1,),float)
+	# time_o = jnp.asarray(vbdata['tDash'].reshape(-1,),float)
+	time_o = vbdata['tDash'].reshape(-1,)
 
 	#Apply fake noise
 	lat_vel_o = add_noise(lat_vel_o)
 	yaw_rate_o = add_noise(yaw_rate_o)
 
 	#Stack the data
-	target = jnp.stack([lat_vel_o,yaw_rate_o],axis=-1)
+	target = np.stack([lat_vel_o,yaw_rate_o],axis=-1)
 
 	#For file saving
 	date = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -128,10 +138,18 @@ def main():
 	Vx = 50./3.6 #Longitudanal Velocity
 	Vy = 0. #Lateral velocity
 	yr = 0. #Yaw rate
-	state = jnp.array([Vy,Vx,yr,wf,wr],float)
+	# state = jnp.array([Vy,Vx,yr,wf,wr],float)
+	state = [Vy,Vx,yr,wf,wr]
 
+	Cf = -88000.
+	Cr = -88000.
+	Iz = 1000.
+	sigmaVy = 0.006
+	sigmaYr = 0.04
+	theta = [Cf,Cr,Iz,sigmaVy,sigmaYr]
 
-	like = LogLike(loglike,state,time_o,target)
+	logp_op(theta,state,time_o,target).eval()
+	logprob_grad_op(theta,state,time_o,target)[1].eval()
 
 	with pm.Model() as model:
 
@@ -142,13 +160,14 @@ def main():
 		sigmaYr = pm.HalfNormal("sigmaLat_acc",sigma = 0.03,initval=0.03) #Noise for yaw rate
 
 		#Hopefully this jnp array works
+		theta_ = [Cf,Cr,Iz,sigmaVy,sigmaYr]
 		theta = at.as_tensor_variable([Cf,Cr,Iz,sigmaVy,sigmaYr])
 
 		#Sample using our custom likelihood
-		pm.Potential("like",like(theta))
+		pm.Potential("like",logp_op(theta,state,time_o,target))
 
-		#Now we sample!
-		#We use metropolis as the algorithm with parameters to be sampled supplied through vars
+
+		#Sampling
 		transcript.start('./results/' + savedir + '_dump.log')
 		if(sys.argv[2] == "nuts"):
 			# step = pm.NUTS()
@@ -156,12 +175,25 @@ def main():
 			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
 		elif(sys.argv[2] == "met"):
 			step = pm.Metropolis()
-			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=4)
+			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
 		else:
 			print("provide nuts or met as the stepping method")
 
 
+		transcript.start('./results/' + savedir + '.log')
 
+		print(f"{datafile=}")
+
+		for i in range(0,len(theta_)):
+			print(f"{theta_[i]}")
+
+		try:
+			print(az.summary(idata).to_string())
+		except KeyError:
+			idata.to_netcdf('./results/' + savedir + ".nc")
+
+		idata.to_netcdf('./results/' + savedir + ".nc")
+		transcript.stop('./results/' + savedir + '.log')
 
 
 if __name__ == "__main__":

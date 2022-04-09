@@ -1,6 +1,5 @@
 import matplotlib.pyplot as mpl
-import theano.tensor as tt
-import pymc3 as pm
+import pymc as pm
 import arviz as az
 import os
 import sys
