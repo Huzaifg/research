@@ -5,7 +5,6 @@ import os
 import sys
 import numpy as np
 #Import our 8dof vehicle model
-from vd_bi_mod import vehicle_bi
 
 
 """

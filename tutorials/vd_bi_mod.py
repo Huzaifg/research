@@ -4,7 +4,7 @@ from math import atan,cos,sin
 # import warnings
 # warnings.filterwarnings("error")
 
-def vehicle_bi(theta,tt,st_input,init_cond):
+def vehicle_bi_old(theta,tt,st_input,init_cond):
 	"""
 	The bicycle vehicle model that is our physical model for bayesian inference.
 	This is adopted from the matlab script - https://github.com/uwsbel/projectlets/tree/master/model-repo/misc/2019/vehicles-matlab/8_DOF
