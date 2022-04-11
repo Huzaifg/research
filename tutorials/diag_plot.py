@@ -1,12 +1,10 @@
 import matplotlib.pyplot as mpl
-import theano.tensor as tt
-import pymc3 as pm
+import pymc as pm
 import arviz as az
 import os
 import sys
 import numpy as np
-#Import our 8dof vehicle model
-from vd_bi_mod import vehicle_bi
+
 
 
 """
@@ -67,7 +65,7 @@ def main():
 
 
 	#Autocorrelation plot
-	ax_autocorr = az.plot_autocorr(idata)
+	ax_autocorr = az.plot_autocorr(idata,combined = True,figsize = (14,12))
 	fig = ax_autocorr.ravel()[0].figure
 	if(save):
 		fig.savefig(path + filename + "_autocorr.png",facecolor = 'w')
