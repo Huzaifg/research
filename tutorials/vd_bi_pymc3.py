@@ -318,11 +318,7 @@ def main():
 		# m = 1720
 		# Iz = 2420
 		# Iz = pm.TruncatedNormal('Iz',mu = 2000, sigma = 1000, lower = 300,upper = 3500,testval= 2450)
-<<<<<<< HEAD
 		Iz = pm.Uniform('Iz',lower = 100, upper = 3000,testval = 2450) # yaw moment of inertia (kg.m^2)
-=======
-		Iz = pm.Uniform('Iz',lower = 500, upper = 3000,initval = 2450) # yaw moment of inertia (kg.m^2)
->>>>>>> 0495b65973a25def25207609d04b4732d393f0ee
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
 			# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
@@ -338,11 +334,7 @@ def main():
 		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
 		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
 		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
-<<<<<<< HEAD
-		sigmaYaw_rate = pm.HalfNormal("sigmaYaw_rate",sigma = 0.6,testval=0.6)
-=======
-		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.3,initval=0.3)
->>>>>>> 0495b65973a25def25207609d04b4732d393f0ee
+		sigmaYaw_rate = pm.HalfNormal("sigmaYaw_rate",sigma = 0.06,testval=0.06)
 		# sigmaCom = pm.HalfNormal("sigmaCom",sigma = 0.06,testval=0.05)
 
 		## Convert our theta into a theano tensor
