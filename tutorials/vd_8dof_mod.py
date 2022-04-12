@@ -39,33 +39,61 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
 
     ### Our model parameters, some are sampled some are not
 
-    m=theta[0]  # Sprung mass (kg)
-    Jx=theta[1]   # Sprung mass roll inertia (kg.m^2)
-    Jy=theta[2]   # Sprung mass pitch inertia (kg.m^2)
-    Jz=theta[3]   # Sprung mass yaw inertia (kg.m^2)
-    a=theta[4]   # Distance of sprung mass c.g. from front axle (m)
-    b=theta[5]   # Distance of sprung mass c.g. from rear axle (m)
-    Jxz=theta[6]   # Sprung mass XZ product of inertia
-    Jw=theta[7]     #tire/wheel roll inertia kg.m^2
-    g=theta[8]    # acceleration of gravity 
-    h=theta[9]    # Sprung mass c.g. height (m)
-    cf=theta[10]    # front track width (m)
-    cr=theta[11]    # rear track width (m)
-    muf=theta[12]      #front unsprung mass (kg)
-    mur=theta[13]      #rear unsprung mass (kg)
-    ktf=theta[14]    #front tire stiffness (N/m)
-    ktr=theta[15]    #rear tire stiffness (N/m)
-    Cf=theta[16]   #front tire cornering stiffness (N/rad)
-    Cr=theta[17]   #rear tire cornering stiffness (N/rad)
-    Cxf=theta[18]   #front tire longitudinal stiffness (N)
-    Cxr=theta[19]   #rear tire longitudinal stiffness (N)
-    r0=theta[20]   #nominal tire radius (m)s
-    hrcf=theta[21]   #front roll center distance below sprung mass c.g.
-    hrcr=theta[22]    #rear roll center distance below sprung mass c.g.
-    krof=theta[23]   #front roll stiffness (Nm/rad)
-    kror=theta[24]   #rear roll stiffness (Nm/rad)
-    brof=theta[25]    #front roll damping coefficient (Nm.s/rad)
-    bror=theta[26]    #rear roll damping coefficient (Nm.s/rad)
+    # m=theta[0]  # Sprung mass (kg)
+    # Jx=theta[1]   # Sprung mass roll inertia (kg.m^2)
+    # Jy=theta[2]   # Sprung mass pitch inertia (kg.m^2)
+    # Jz=theta[3]   # Sprung mass yaw inertia (kg.m^2)
+    # a=theta[4]   # Distance of sprung mass c.g. from front axle (m)
+    # b=theta[5]   # Distance of sprung mass c.g. from rear axle (m)
+    # Jxz=theta[6]   # Sprung mass XZ product of inertia
+    # Jw=theta[7]     #tire/wheel roll inertia kg.m^2
+    # g=theta[8]    # acceleration of gravity 
+    # h=theta[9]    # Sprung mass c.g. height (m)
+    # cf=theta[10]    # front track width (m)
+    # cr=theta[11]    # rear track width (m)
+    # muf=theta[12]      #front unsprung mass (kg)
+    # mur=theta[13]      #rear unsprung mass (kg)
+    # ktf=theta[14]    #front tire stiffness (N/m)
+    # ktr=theta[15]    #rear tire stiffness (N/m)
+    # Cf=theta[16]   #front tire cornering stiffness (N/rad)
+    # Cr=theta[17]   #rear tire cornering stiffness (N/rad)
+    # Cxf=theta[18]   #front tire longitudinal stiffness (N)
+    # Cxr=theta[19]   #rear tire longitudinal stiffness (N)
+    # r0=theta[20]   #nominal tire radius (m)s
+    # hrcf=theta[21]   #front roll center distance below sprung mass c.g.
+    # hrcr=theta[22]    #rear roll center distance below sprung mass c.g.
+    # krof=theta[23]   #front roll stiffness (Nm/rad)
+    # kror=theta[24]   #rear roll stiffness (Nm/rad)
+    # brof=theta[25]    #front roll damping coefficient (Nm.s/rad)
+    # bror=theta[26]    #rear roll damping coefficient (Nm.s/rad)
+    m=1400  # Sprung mass (kg)
+    Jx=900  # Sprung mass roll inertia (kg.m^2)
+    Jy=2000  # Sprung mass pitch inertia (kg.m^2)
+    Jz=2420  # Sprung mass yaw inertia (kg.m^2)
+    a=1.14  # Distance of sprung mass c.g. from front axle (m)
+    b=1.4   # Distance of sprung mass c.g. from rear axle (m)
+    Jxz=90  # Sprung mass XZ product of inertia
+    Jw=1    #tire/wheel roll inertia kg.m^2
+    g=9.8    # acceleration of gravity 
+    h=0.75   # Sprung mass c.g. height (m)
+    cf=1.5   # front track width (m)
+    cr=1.5   # rear track width (m)
+    muf=80     #front unsprung mass (kg)
+    mur=80     #rear unsprung mass (kg)
+    ktf=200000   #front tire stiffness (N/m)
+    ktr=200000   #rear tire stiffness (N/m)
+    Cf=theta[0]  #front tire cornering stiffness (N/rad)
+    Cr=theta[1]  #rear tire cornering stiffness (N/rad)
+    Cxf=5000  #front tire longitudinal stiffness (N)
+    Cxr=5000  #rear tire longitudinal stiffness (N)
+    r0=0.285  #nominal tire radius (m)
+    hrcf=0.65  #front roll center distance below sprung mass c.g.
+    hrcr=0.6   #rear roll center distance below sprung mass c.g.
+    krof=29000  #front roll stiffness (Nm/rad)
+    kror=29000  #rear roll stiffness (Nm/rad)
+    brof=3000   #front roll damping coefficient (Nm.s/rad)
+    bror=3000   #rear roll damping coefficient (Nm.s/rad)
+
 
 
     ### The initial conditions
@@ -250,7 +278,8 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
 
     #For now lets just return one of the vectors, we will first work on just using one of the outputs for the bayesian inference
     # mod_data = np.array([long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay])
-    mod_data = np.array([roll_angle,ay,yaw_rate,lat_vel,psi_angle,long_vel])
+    # mod_data = np.array([roll_angle,ay,yaw_rate,lat_vel,psi_angle,long_vel])
+    mod_data = np.array([lat_vel,psi_angle,yaw_rate,ay])
     return mod_data
 
 

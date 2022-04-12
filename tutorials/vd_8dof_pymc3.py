@@ -26,7 +26,7 @@ def loglike(theta,time_o,st_inp,init_cond,data):
 
 	mod_data = vehicle_8dof(theta,time_o,st_inp,init_cond)
 	# Using only the lateeral acceleration and the lateral veclocity
-	mod_data = mod_data[[3,4],:]
+	mod_data = mod_data[[1,3],:]
 
 	# Calculate the difference
 	res = (mod_data - data)
@@ -58,8 +58,14 @@ def grad_loglike(theta,time_o,st_inp,init_cond,data):
 	#We have to define delx for each partial derivative of loglike with theta's
 	# grads = sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
 
-	return sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
+	# Choose a delx that is propotional to the parameter rather than 10^-16 for all
+	l = len(theta)
+	delxs = [0]*l
+	delxs = delx * np.sqrt(np.abs(theta))
 
+
+	# return sp.optimize.approx_fprime(theta,ll,delx*np.ones(len(theta)),time_o,st_inp,init_cond,data)
+	return sp.optimize.approx_fprime(theta,ll,delxs,time_o,st_inp,init_cond,data)
 
 #Copy paste the theano Operation class from stackoverflow - 
 #https://stackoverflow.com/questions/41109292/solving-odes-in-pymc3
@@ -176,7 +182,7 @@ def main():
 
 
 	# First lets load all our data - In this case, our data is from the 14dof model - Should probably add noise to it
-	datafile = 'vd_8dof_47_2.mat'
+	datafile = 'vd_8dof_470.mat'
 	vbdata = sio.loadmat(datafile)
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
@@ -210,52 +216,52 @@ def main():
 	with pm.Model() as model:
 		#We are not sampling the mass so supplying it as a deterministic parameter
 	#     mass = pm.Deterministic("mass",1400)
-		mass = 1400
-		# Sprung mass roll inertia (kg.m^2)
-		# Jx = pm.Uniform("Jx",lower=0.0001,upper=10000,testval = 300)
-		Jx = 900  # Sprung mass roll inertia (kg.m^2)
-		# Sprung mass pitch inertia (kg.m^2)
-		# Jy = pm.Uniform("Jy",lower=0.0001,upper=10000,testval = 300)
-		Jy  = 2000
-		# Sprung mass yaw inertia (kg.m^2)
-		# Jz = pm.Uniform("Jz",lower=0.0001,upper=10000,testval = 300)
-		Jz = 2420
-		# Distance of sprung mass c.g. from front axle (m)
-		# a = pm.Uniform("a",lower=0.0001,upper=10,testval = 0.5)
-		a = 1.14
-		# Distance of sprung mass c.g. from rear axle (m)
-		# b = pm.Uniform("b",lower=0.0001,upper=10,testval = 0.5)
-		b = 1.4
-		# Sprung mass XZ product of inertia
-		# Jxz = pm.Uniform("Jxz",lower=0.0001,upper=1000,testval = 300)
-		Jxz = 90
-		#tire/wheel roll inertia kg.m^2
-		# Jw = pm.Uniform("Jw",lower=0.0001,upper=100,testval = 30)
-		Jw = 1
-		# acceleration of gravity
-	#     g = pm.Deterministic("g",9.8)
-		g = 9.8
-		# Sprung mass c.g. height (m)
-		# h = pm.Uniform("h",lower=0.0001,upper=20,testval = 0.5)
-		h = 0.75
-		# front track width (m)
-		# cf = pm.Uniform("cf",lower=0.0001,upper=20,testval = 0.5)
-		cf = 1.5
-		# rear track width (m)
-		# cr = pm.Uniform("cr",lower=0.0001,upper=20,testval = 0.5)
-		cr = 1.5
-		#front unsprung mass (kg)
-		# muf = pm.Uniform("muf",lower = 0.0001, upper = mass,testval = 100)
-		muf = 80
-		#rear unsprung mass (kg)
-		# mur = pm.Uniform("mur",lower = 0.0001, upper = mass,testval = 100)
-		mur = 80
-		#front tire stiffness (N/m) - Over here we are assuming that all the tires are identical to reduce the number of parameters
-		# ktf = pm.Uniform("ktf",lower=0.0001,upper=500000,testval = 20000)
-		ktf = 200000
-		#rear tire stiffness (N/m) - Since rear tire is identical to front tire, we supply it as a deterministic variable
-		# ktr = pm.Deterministic("ktr",ktf)
-		ktr = 200000
+	# 	mass = 1400
+	# 	# Sprung mass roll inertia (kg.m^2)
+	# 	# Jx = pm.Uniform("Jx",lower=0.0001,upper=10000,testval = 300)
+	# 	Jx = 900  # Sprung mass roll inertia (kg.m^2)
+	# 	# Sprung mass pitch inertia (kg.m^2)
+	# 	# Jy = pm.Uniform("Jy",lower=0.0001,upper=10000,testval = 300)
+	# 	Jy  = 2000
+	# 	# Sprung mass yaw inertia (kg.m^2)
+	# 	# Jz = pm.Uniform("Jz",lower=0.0001,upper=10000,testval = 300)
+	# 	Jz = 2420
+	# 	# Distance of sprung mass c.g. from front axle (m)
+	# 	# a = pm.Uniform("a",lower=0.0001,upper=10,testval = 0.5)
+	# 	a = 1.14
+	# 	# Distance of sprung mass c.g. from rear axle (m)
+	# 	# b = pm.Uniform("b",lower=0.0001,upper=10,testval = 0.5)
+	# 	b = 1.4
+	# 	# Sprung mass XZ product of inertia
+	# 	# Jxz = pm.Uniform("Jxz",lower=0.0001,upper=1000,testval = 300)
+	# 	Jxz = 90
+	# 	#tire/wheel roll inertia kg.m^2
+	# 	# Jw = pm.Uniform("Jw",lower=0.0001,upper=100,testval = 30)
+	# 	Jw = 1
+	# 	# acceleration of gravity
+	# #     g = pm.Deterministic("g",9.8)
+	# 	g = 9.8
+	# 	# Sprung mass c.g. height (m)
+	# 	# h = pm.Uniform("h",lower=0.0001,upper=20,testval = 0.5)
+	# 	h = 0.75
+	# 	# front track width (m)
+	# 	# cf = pm.Uniform("cf",lower=0.0001,upper=20,testval = 0.5)
+	# 	cf = 1.5
+	# 	# rear track width (m)
+	# 	# cr = pm.Uniform("cr",lower=0.0001,upper=20,testval = 0.5)
+	# 	cr = 1.5
+	# 	#front unsprung mass (kg)
+	# 	# muf = pm.Uniform("muf",lower = 0.0001, upper = mass,testval = 100)
+	# 	muf = 80
+	# 	#rear unsprung mass (kg)
+	# 	# mur = pm.Uniform("mur",lower = 0.0001, upper = mass,testval = 100)
+	# 	mur = 80
+	# 	#front tire stiffness (N/m) - Over here we are assuming that all the tires are identical to reduce the number of parameters
+	# 	# ktf = pm.Uniform("ktf",lower=0.0001,upper=500000,testval = 20000)
+	# 	ktf = 200000
+	# 	#rear tire stiffness (N/m) - Since rear tire is identical to front tire, we supply it as a deterministic variable
+	# 	# ktr = pm.Deterministic("ktr",ktf)
+	# 	ktr = 200000
 		#front tire cornering stiffness (N/rad) - Over here we are assuming that all the tires are identical to reduce the number of parameters
 		Cf = pm.Uniform("Cf",lower=-60000,upper=-30000,testval = -40000)
 		#rear tire stiffness (N/m) - Since rear tire is identical to front tire, we supply it as a deterministic variable
@@ -263,45 +269,46 @@ def main():
 		Cr = pm.Uniform("Cr",lower=-60000,upper=-30000,testval = -40000)
 		#front tire longitudinal stiffness (N)
 		# Cxf = pm.Uniform("cxf",lower=0.0001,upper=10000,testval = 1000)
-		Cxf = 5000
-		#rear tire longitudinal stiffness (N) - Same as front tire
-		# Cxr = pm.Deterministic("Cxr",Cxf)
-		Cxr = 5000
-		#nominal tire radius (m) - Easily measurable so not sampled
-	#     r0 = pm.Deterministic("r0", 0.285)
-		r0 = 0.285
-		#front roll center distance below sprung mass c.g.
-		# hrcf = pm.Uniform("hrcf",lower=0.0001,upper=20,testval = 0.5)
-		hrcf = 0.65
-		#rear roll center distance below sprung mass c.g.
-		# hrcr = pm.Uniform("hrcr",lower=0.0001,upper=20,testval = 0.5)
-		hrcr = 0.6
-		#front roll stiffness (Nm/rad)
-		# krof = pm.Uniform("krof",lower=0.0001,upper=100000,testval = 10000)
-		krof = 29000
-		#rear roll stiffness (Nm/rad)
-		# kror = pm.Uniform("kror",lower=0.0001,upper=100000,testval = 10000)
-		kror = 29000
-		#front roll damping coefficient (Nm.s/rad)
-		# brof = pm.Uniform("brof",lower=0,upper=10000,testval = 1000)
-		brof = 3000
-		#rear roll damping coefficient (Nm.s/rad)
-		# bror = pm.Uniform("bror",lower=0.0001,upper=10000,testval = 1000)
-		bror = 3000
+	# 	Cxf = 5000
+	# 	#rear tire longitudinal stiffness (N) - Same as front tire
+	# 	# Cxr = pm.Deterministic("Cxr",Cxf)
+	# 	Cxr = 5000
+	# 	#nominal tire radius (m) - Easily measurable so not sampled
+	# #     r0 = pm.Deterministic("r0", 0.285)
+	# 	r0 = 0.285
+	# 	#front roll center distance below sprung mass c.g.
+	# 	# hrcf = pm.Uniform("hrcf",lower=0.0001,upper=20,testval = 0.5)
+	# 	hrcf = 0.65
+	# 	#rear roll center distance below sprung mass c.g.
+	# 	# hrcr = pm.Uniform("hrcr",lower=0.0001,upper=20,testval = 0.5)
+	# 	hrcr = 0.6
+	# 	#front roll stiffness (Nm/rad)
+	# 	# krof = pm.Uniform("krof",lower=0.0001,upper=100000,testval = 10000)
+	# 	krof = 29000
+	# 	#rear roll stiffness (Nm/rad)
+	# 	# kror = pm.Uniform("kror",lower=0.0001,upper=100000,testval = 10000)
+	# 	kror = 29000
+	# 	#front roll damping coefficient (Nm.s/rad)
+	# 	# brof = pm.Uniform("brof",lower=0,upper=10000,testval = 1000)
+	# 	brof = 3000
+	# 	#rear roll damping coefficient (Nm.s/rad)
+	# 	# bror = pm.Uniform("bror",lower=0.0001,upper=10000,testval = 1000)
+	# 	bror = 3000
 
 
 
 		#We are also sampling our observation noise - Seems like a standard to use Half normal for this - Expect the same amount of precicsion so same prior
 		# sigmaVx = pm.HalfNormal("sigmaVx",sigma = 0.6,testval=0.1)
-		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.06,testval=0.05)
+		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.006,testval=0.005)
 		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
 		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
 		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
-		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.06,testval=0.05)
+		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.6,testval=0.5)
 
 
 		## All of these will be a tensor 
-		theta_ = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror,sigmaLat_acc,sigmaVy]
+		# theta_ = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror,sigmaLat_acc,sigmaVy]
+		theta_ = [Cf,Cr,sigmaVy,sigmaLat_acc]
 		theta = tt.as_tensor_variable(theta_)
 
 		#According to this thread, we should use pm.Potential
@@ -315,17 +322,14 @@ def main():
 		if(sys.argv[2] == "nuts"):
 			# step = pm.NUTS()
 			# pm.sampling.init_nuts()
-			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=2)
+			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
 		elif(sys.argv[2] == "met"):
 			step = pm.Metropolis()
-			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
+			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=4)
 		else:
 			print("Please provide nuts or met as the stepping method")
 
-
-		trace = idata.posterior
-
-
+		idata.to_netcdf('./results/' + savedir + ".nc")
 		transcript.start('./results/' + savedir + '.log')
 
 		print(f"{datafile=}")
@@ -334,11 +338,11 @@ def main():
 			print(f"{theta_[i]}")
 
 		try:
-			print(az.summary(idata,var_names = ['Cf','Cr','sigmaVy']).to_string())
+			print(az.summary(idata).to_string())
 		except KeyError:
 			idata.to_netcdf('./results/' + savedir + ".nc")
 
-		idata.to_netcdf('./results/' + savedir + ".nc")
+		
 		transcript.stop('./results/' + savedir + '.log')
 
 
