@@ -4,7 +4,11 @@ import arviz as az
 import os
 import sys
 import numpy as np
+<<<<<<< HEAD
 
+=======
+#Import our 8dof vehicle model
+>>>>>>> 0495b65973a25def25207609d04b4732d393f0ee
 
 
 """
@@ -65,7 +69,11 @@ def main():
 
 
 	#Autocorrelation plot
+<<<<<<< HEAD
 	ax_autocorr = az.plot_autocorr(idata,combined = True,figsize = (14,12))
+=======
+	ax_autocorr = az.plot_autocorr(idata,combined = True)
+>>>>>>> 0495b65973a25def25207609d04b4732d393f0ee
 	fig = ax_autocorr.ravel()[0].figure
 	if(save):
 		fig.savefig(path + filename + "_autocorr.png",facecolor = 'w')
@@ -92,6 +100,10 @@ def main():
 		print(f"The number of divergences is {divergences}")
 		print(f"The percentage of divergences is {round(percent,5)}")
 	except:
+		print(f"Sampling time in hours {round(idata.sample_stats._t_sampling/3600,2)}")
+		print(f"The number of draws are {idata.posterior.draw.shape[0]}")
+		print(f"The Bulk relative effective sample size is {az.ess(idata,relative = True)}")
+		print(f"The Bulk Effective samples per second is {az.ess(idata)/idata.sample_stats._t_sampling}")	
 		print("You probably ran Metropolis and not NUTS")
 		return
 
