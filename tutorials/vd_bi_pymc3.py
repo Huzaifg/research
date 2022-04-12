@@ -38,7 +38,7 @@ def loglike(theta,time_o,st_inp,init_cond,data):
 
     mod_data = vehicle_bi(theta,time_o,st_inp,init_cond)
     # Using only the lateeral acceleration and the lateral veclocity
-    mod_data = mod_data[[0,3],:]
+    mod_data = mod_data[[0,2],:]
     # Discard data that is not around the manuever
 
 
@@ -262,7 +262,7 @@ def main():
 	#Make all these vectors into column vecctors in the matrix data
 	# data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
 	# data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
-	data = np.array([lat_vel_o,lat_acc_o])
+	data = np.array([lat_vel_o,yaw_rate_o])
 	# data = np.array([lat_vel_o])
 	## Add noise to all the outputs
 
@@ -316,7 +316,7 @@ def main():
 		# m = 1720
 		# Iz = 2420
 		# Iz = pm.TruncatedNormal('Iz',mu = 2000, sigma = 1000, lower = 300,upper = 3500,testval= 2450)
-		Iz = pm.Uniform('Iz',lower = 500, upper = 3000,testval = 2450) # yaw moment of inertia (kg.m^2)
+		Iz = pm.Uniform('Iz',lower = 100, upper = 3000,testval = 2450) # yaw moment of inertia (kg.m^2)
 		# Rr = pm.Uniform('Rr',lower = 0.001, upper = 2,testval = 1) # wheel radius
 		Rr = 0.285
 			# Jw = pm.Uniform('Jw',lower = 0.001, upper = 5,testval = 1) # wheel roll inertia
@@ -332,13 +332,13 @@ def main():
 		# sigmaPsi = pm.HalfNormal("sigmaPsi",sigma = 0.6,testval=0.1)
 		# sigmaPsi_dot = pm.HalfNormal("sigmaPsi_dot",sigma = 0.6,testval=0.1)
 		# sigmaLat_acc = pm.Normal("sigmaLat_acc",mu = 0,sigma = 0.06,testval=0.05)
-		sigmaLat_acc = pm.HalfNormal("sigmaLat_acc",sigma = 0.3,testval=0.3)
+		sigmaYaw_rate = pm.HalfNormal("sigmaYaw_rate",sigma = 0.6,testval=0.6)
 		# sigmaCom = pm.HalfNormal("sigmaCom",sigma = 0.06,testval=0.05)
 
 		## Convert our theta into a theano tensor
 		# theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaLat_acc]
 		# theta_ = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,m_,sigmaLat_acc,sigmaVy]
-		theta_ = [Cf,Cr,Iz,sigmaVy,sigmaLat_acc]
+		theta_ = [Cf,Cr,Iz,sigmaVy,sigmaYaw_rate]
 		# theta_ = [Cf,Cr,m,sigmaVy]
 		# theta = tt.as_tensor_variable([a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw,sigmaVy,sigmaPsi,sigmaPsi_dot,sigmaLat_acc])
 		theta = tt.as_tensor_variable(theta_)

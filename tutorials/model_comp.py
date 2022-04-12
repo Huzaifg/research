@@ -3,7 +3,7 @@ import scipy.io as sio
 from scipy.integrate import solve_ivp
 import scipy as sp
 import matplotlib.pyplot as mpl
-import pymc3 as pm
+import pymc as pm
 import arviz as az
 import pandas as pd
 import os
@@ -78,8 +78,8 @@ def main():
 	save = sys.argv[5].lower() == 'true'
 	data_dof = sys.argv[3]
 	# The vector of data to plot which will be used as the title
-	title = ['Longitudual Velocity','Lateral Velocity','Yaw Angle','Yaw Rate','Lateral Acceleration']
-	units = ['(m/s)','(m/s)','(rad)','(rad/s)','(m/s^2)']
+	title = ['Lateral Velocity','Yaw Angle','Yaw Rate','Lateral Acceleration']
+	units = ['(m/s)','(rad)','(rad/s)','(m/s^2)']
 
 	# The data reading and formating
 	dataFileName = sys.argv[4]
@@ -107,13 +107,13 @@ def main():
 	        Cxr = 10000
 	        # Cxr = idata.posterior.mean()['Cxr']
 	        # m=idata.posterior.mean()['m']  # the mass of the vehicle (kg)
-	        m = idata.posterior.mean()['m']
+	        m = 1720
 	        # m = idata.posterior.mean()['m']
 	        Iz=idata.posterior.mean()['Iz'] # yaw moment of inertia (kg.m^2)
 	        Rr=0.285 # wheel radius
 	        Jw=1*2  # wheel roll inertia
 	        # theta = [a,b,Cf,Cr,Cxf,Cxr,m,Iz,Rr,Jw]
-	        theta = [Cf,Cr,m,Iz]
+	        theta = [Cf,Cr,Iz]
 	        init_cond = { 'Vy' : 0, 'Vx' : 50./3.6 , 'psi' : 0, 'psi_dot' : 0, 'Y' : 0, 'X' : 0}
 	    elif(mod_data_dof[0] == '8'):
 	        mass = 1400
@@ -197,17 +197,14 @@ def main():
 
 
 
-	data = np.array([long_vel_o,lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
+	data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
 
 
 
 	# Add all the noise
 	noOutputs= data.shape[0]
 	for i in range(noOutputs):
-		if(i == 0):
-			data[i,:] = long_vel_noise(data[i,:])
-		else:
-			data[i,:] = add_noise(data[i,:])
+		data[i,:] = add_noise(data[i,:])
 
 
 	# The prediction
