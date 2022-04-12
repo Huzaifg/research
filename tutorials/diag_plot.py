@@ -65,7 +65,7 @@ def main():
 
 
 	#Autocorrelation plot
-	ax_autocorr = az.plot_autocorr(idata)
+	ax_autocorr = az.plot_autocorr(idata,combined = True)
 	fig = ax_autocorr.ravel()[0].figure
 	if(save):
 		fig.savefig(path + filename + "_autocorr.png",facecolor = 'w')
@@ -92,6 +92,10 @@ def main():
 		print(f"The number of divergences is {divergences}")
 		print(f"The percentage of divergences is {round(percent,5)}")
 	except:
+		print(f"Sampling time in hours {round(idata.sample_stats._t_sampling/3600,2)}")
+		print(f"The number of draws are {idata.posterior.draw.shape[0]}")
+		print(f"The Bulk relative effective sample size is {az.ess(idata,relative = True)}")
+		print(f"The Bulk Effective samples per second is {az.ess(idata)/idata.sample_stats._t_sampling}")	
 		print("You probably ran Metropolis and not NUTS")
 		return
 
