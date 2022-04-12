@@ -4,11 +4,9 @@ import arviz as az
 import os
 import sys
 import numpy as np
-<<<<<<< HEAD
+from bokeh.io import export_png
+from bokeh.layouts import gridplot
 
-=======
-#Import our 8dof vehicle model
->>>>>>> 0495b65973a25def25207609d04b4732d393f0ee
 
 
 """
@@ -54,11 +52,14 @@ def main():
 	mpl.show()
 
 	#Plot the trace
-	ax_trace = az.plot_trace(idata,figsize = (14,6*2))
-	fig = ax_trace.ravel()[0].figure
+	ax_trace = az.plot_trace(idata,backend = "bokeh",figsize = (12,14))
 	if(save):
-		fig.savefig(path + filename + "_trace.png",facecolor = 'w')
-	mpl.show()
+		export_png(gridplot(ax_trace.tolist()), filename=path + filename + "_trace.png")
+
+	# fig = ax_trace.ravel()[0].figure
+	# if(save):
+	# 	fig.savefig(path + filename + "_trace.png",facecolor = 'w')
+	# mpl.show()
 
 	# Plot pairwise plot
 	ax_pair = az.plot_pair(idata,divergences = True,figsize = (14,6*2))
@@ -69,11 +70,7 @@ def main():
 
 
 	#Autocorrelation plot
-<<<<<<< HEAD
-	ax_autocorr = az.plot_autocorr(idata,combined = True,figsize = (14,12))
-=======
-	ax_autocorr = az.plot_autocorr(idata,combined = True)
->>>>>>> 0495b65973a25def25207609d04b4732d393f0ee
+	ax_autocorr = az.plot_autocorr(idata,combined = True,figsize = (14,12),textsize = 14)
 	fig = ax_autocorr.ravel()[0].figure
 	if(save):
 		fig.savefig(path + filename + "_autocorr.png",facecolor = 'w')
