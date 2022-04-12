@@ -30,7 +30,7 @@ def add_noise(a):
 @jit
 def loglike(theta,state,time,targets):
 	#Evaluate the model
-	mod = odeint(vehicle_bi, state , time,theta,rtol=1e-6, atol=1e-5, mxstep=1000)
+	mod = odeint(vehicle_bi, state , time,theta,rtol=1e-4, atol=1e-7, mxstep=10000)
 	#Get the sigmas from theta
 	sigmas = jnp.array(theta[-(targets.shape[1]):],float)
 	#Evaluate negetive of log likelihood
@@ -155,7 +155,7 @@ def main():
 
 		Cf = pm.Uniform('Cf',lower = -150000, upper = -50000,initval = -80000) # front axle cornering stiffness (N/rad)
 		Cr = pm.Uniform('Cr',lower = -150000, upper = -50000,initval = -80000) # rear axle cornering stiffness (N/rad)
-		Iz = pm.Uniform('Iz',lower = 500, upper = 3000,initval = 2450) # yaw moment of inertia (kg.m^2)
+		Iz = pm.Uniform('Iz',lower = 100, upper = 3000,initval = 2450) # yaw moment of inertia (kg.m^2)
 		sigmaVy = pm.HalfNormal("sigmaVy",sigma = 0.006,initval=0.005) # Noise for lateral velocity
 		sigmaYr = pm.HalfNormal("sigmaLat_acc",sigma = 0.03,initval=0.03) #Noise for yaw rate
 
@@ -175,7 +175,9 @@ def main():
 			idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
 		elif(sys.argv[2] == "met"):
 			step = pm.Metropolis()
-			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=2)
+			idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=4)
+		elif(sys.argv[2] == "smc"):
+			idata = pm.sample_smc(draws = ndraws,return_inferencedata=True,cores=4)
 		else:
 			print("provide nuts or met as the stepping method")
 
