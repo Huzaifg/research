@@ -34,6 +34,8 @@ def vehicle_bi(state,t,theta):
 	def ramp_st(t):
 		return jnp.where(t > 1, 3.*jnp.pi/180.*(t-1) ,0)
 
+	def sin_st(t):
+		return jnp.where( t > 1, 0.5*jnp.pi/180*jnp.sin((1/3)*2.*jnp.pi*(t-1)),0)
 
 
 	#The vehicle parameters
@@ -58,7 +60,7 @@ def vehicle_bi(state,t,theta):
 
 
 	#Some preliminaries used in the ODE's
-	sf=(Rr*wf-(Vx*jnp.cos(ramp_st(t))+(Vy+a*psi_dot)*jnp.sin(ramp_st(t))))/jnp.abs(Vx*jnp.cos(ramp_st(t))+(Vy+a*psi_dot)*jnp.sin(ramp_st(t)))
+	sf=(Rr*wf-(Vx*jnp.cos(sin_st(t))+(Vy+a*psi_dot)*jnp.sin(sin_st(t))))/jnp.abs(Vx*jnp.cos(sin_st(t))+(Vy+a*psi_dot)*jnp.sin(sin_st(t)))
 	sr=(Rr*wr-Vx)/jnp.abs(Vx)
 	Fxtf=Cxf*sf
 	Fxtr=Cxr*sr
@@ -66,9 +68,9 @@ def vehicle_bi(state,t,theta):
 
 
 	#ODE's
-	Vy_dot=-Vx*psi_dot+(1/m)*(Cf*((Vy+a*psi_dot)/Vx-ramp_st(t))+Cr*((Vy-b*psi_dot)/Vx))
-	Vx_dot=Vy*psi_dot+(sf*Cxf+sr*Cxr)/m-ramp_st(t)*Cf*((Vy+a*psi_dot)/Vx-ramp_st(t))/m
-	dpsi_dot=1/Iz*(a*Cf*((Vy+a*psi_dot)/Vx-ramp_st(t))-b*Cr*((Vy-b*psi_dot)/Vx))
+	Vy_dot=-Vx*psi_dot+(1/m)*(Cf*((Vy+a*psi_dot)/Vx-sin_st(t))+Cr*((Vy-b*psi_dot)/Vx))
+	Vx_dot=Vy*psi_dot+(sf*Cxf+sr*Cxr)/m-sin_st(t)*Cf*((Vy+a*psi_dot)/Vx-sin_st(t))/m
+	dpsi_dot=1/Iz*(a*Cf*((Vy+a*psi_dot)/Vx-sin_st(t))-b*Cr*((Vy-b*psi_dot)/Vx))
 	dwf=-(1/Jw)*Fxtf*Rr
 	dwr=-(1/Jw)*Fxtr*Rr
 
