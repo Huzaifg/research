@@ -37,19 +37,21 @@ def main():
 
 
 
-	ax_post = az.plot_posterior(idata)
-	fig = ax_post.ravel()[0].figure
+	ax_post = az.plot_posterior(idata,backend="bokeh",figsize = (20,12))
+	# fig = ax_post.ravel()[0].figure
 
 	path = 'images/'
 	if(os.path.isdir(path)):
 		if(save):
-			fig.savefig(path + filename + "_post.png",facecolor = 'w')
+			# fig.savefig(path + filename + "_post.png",facecolor = 'w')
+			export_png(gridplot(ax_post.tolist()), filename=path + filename + "_post.png")
 	else:
 		os.mkdir(path)
 		if(save):
-			fig.savefig(path + filename + "_post.png",facecolor = 'w')
+			# fig.savefig(path + filename + "_post.png",facecolor = 'w')
+			export_png(gridplot(ax_post.tolist()), filename=path + filename + "_post.png")
 	
-	mpl.show()
+	# mpl.show()
 
 	#Plot the trace
 	ax_trace = az.plot_trace(idata,backend = "bokeh",figsize = (12,14))
@@ -62,29 +64,35 @@ def main():
 	# mpl.show()
 
 	# Plot pairwise plot
-	ax_pair = az.plot_pair(idata,divergences = True,figsize = (14,6*2))
-	fig = ax_pair.ravel()[0].figure
+	ax_pair = az.plot_pair(idata,backend = "bokeh",divergences = True,figsize = (14,6*2))
+	# fig = ax_pair.ravel()[0].figure
 	if(save):
-		fig.savefig(path + filename + "_pair.png",facecolor = 'w')
-	mpl.show()
+		# fig.savefig(path + filename + "_pair.png",facecolor = 'w')
+		export_png(gridplot(ax_pair.tolist()), filename=path + filename + "_pair.png")
+	# mpl.show()
 
 
 	#Autocorrelation plot
-	ax_autocorr = az.plot_autocorr(idata,combined = True,figsize = (14,12),textsize = 14)
-	fig = ax_autocorr.ravel()[0].figure
+	ax_autocorr = az.plot_autocorr(idata,backend = "bokeh",combined = True,figsize = (14,12),textsize = 14)
+	# fig = ax_autocorr.ravel()[0].figure
 	if(save):
-		fig.savefig(path + filename + "_autocorr.png",facecolor = 'w')
-	mpl.show()
+		# fig.savefig(path + filename + "_autocorr.png",facecolor = 'w')
+		export_png(gridplot(ax_autocorr.tolist()), filename=path + filename + "_autocorr.png")
+	# mpl.show()
 
 
-	ax_ess = az.plot_ess(idata,kind = "evolution")
-	fig = ax_ess.ravel()[0].figure
+	ax_ess = az.plot_ess(idata,backend = "bokeh",kind = "evolution",figsize = (16,8))
+	# fig = ax_ess.ravel()[0].figure
 	if(save):
-		fig.savefig(path + filename + "_ess.png",facecolor = 'w')
-	mpl.show()
+		# fig.savefig(path + filename + "_ess.png",facecolor = 'w')
+		export_png(gridplot(ax_ess.tolist()), filename=path + filename + "_ess.png")
+	# mpl.show()
 
+	sum_stats = az.summary(idata,kind='diagnostics',round_to = 4)
 
 	try:
+		print(sum_stats.loc[:,'r_hat'].to_string())
+		print(f"Mean r_hat for all paramters is {sum_stats.loc[:,'r_hat'].mean()}")
 		print(f"Sampling time in hours {round(idata.sample_stats.sampling_time/3600,2)}")
 		print(f"The number of draws are {idata.posterior.draw.shape[0]}")
 		print(f"The Bulk relative effective sample size is {az.ess(idata,relative = True)}")

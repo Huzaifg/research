@@ -10,7 +10,6 @@ import os
 from datetime import datetime
 import sys
 from math import atan,cos,sin
-from vd_bi_mod import vehicle_bi
 from vd_8dof_mod import vehicle_8dof
 
 
@@ -20,8 +19,9 @@ Requires the following command line inputs
 mod_data_dof : The dof of the model which was fitted (used as black box in mcmc)
 filename : The filename of the inference data file generated after mcmc. DO NOT prepend the results subdirectory or the file extension
 data_dof - The dof of the data model that this fit is being compared to
-dataFileName - The .mat file that the fit is being comparaed to - Over here DO append the file extension .mat
+npts - The number of points in the data - 470
 save : True/False - Whether the plots need to be saved to ./images
+st_type : steering type - ramp/sin
 
 
 Returns : 
@@ -79,14 +79,15 @@ def main():
 	data_dof = sys.argv[3]
 	# The vector of data to plot which will be used as the title
 	title = ['Lateral Velocity','Yaw Angle','Yaw Rate','Lateral Acceleration']
-	units = ['(m/s)','(rad)','(rad/s)','(m/s^2)']
+	units = ['(m/s)','rad','rad/s','(m/s^2)']
 
-	# The data reading and formating
-	dataFileName = sys.argv[4]
+	# n of points in data
+	n_pts = sys.argv[4]
+
+	st_type = sys.argv[6]
 
 
 
-	print(f"The command line arguments provided are {mod_data_dof = }, {filename = }, {save = },{ data_dof= }, {dataFileName = }")
 
 
 
@@ -116,13 +117,13 @@ def main():
 	        theta = [Cf,Cr,Iz]
 	        init_cond = { 'Vy' : 0, 'Vx' : 50./3.6 , 'psi' : 0, 'psi_dot' : 0, 'Y' : 0, 'X' : 0}
 	    elif(mod_data_dof[0] == '8'):
-	        mass = 1400
+	        m = 1400
 	        # Sprung mass roll inertia (kg.m^2)
 	        Jx = 900  # Sprung mass roll inertia (kg.m^2)
 	        # Sprung mass pitch inertia (kg.m^2)
 	        Jy  = 2000
 	        # Sprung mass yaw inertia (kg.m^2)
-	        Jz = 2420
+	        Jz = idata.posterior.mean()['Jz']
 	        # Distance of sprung mass c.g. from front axle (m)
 	        a = 1.14
 	        # Distance of sprung mass c.g. from rear axle (m)
@@ -170,7 +171,7 @@ def main():
 	        #rear roll damping coefficient (Nm.s/rad)
 	        bror = 3000
 	        # theta = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror]
-	        theta = [Cf,Cr]
+	        theta = [Cf,Cr,Jz]
 	        init_cond = { 'u' : 50./3.6, 'v' : 0 , 'u_dot' : 0, 'v_dot' : 0, 'phi' : 0, 'psi' : 0, 'dphi' : 0, 'dpsi' : 0, 'wx' : 0, 'wy' : 0,
 	'wz' : 0, 'wx_dot' : 0, 'wz_dot' : 0 }
 	        
@@ -179,32 +180,28 @@ def main():
 	        raise KeyError
 
 
+	print(data_dof,n_pts,st_type)
+
+	if((data_dof == '14dof') & (n_pts == '470') & (st_type == 'ramp')):
+		dataFileName = "vd_14dof_470.npy"
+		timeName = "time_14dof_470.npy"
+		stName = 'st_inp_14dof_ramp_470.npy'
+	
+	elif((data_dof == '14dof') & (n_pts == '470') & (st_type == 'sin')):
+		dataFileName = "vd_14dof_470_sin.npy"
+		timeName = "time_14dof_470_sin.npy"
+		stName = "st_inp_14dof_sin_470.npy"
+	
+
+	with open(dataFileName, 'rb') as f:
+		data = np.load(f)
+
+	with open(timeName, 'rb') as f:
+		time_o = np.load(f)
 
 
-
-
-	vbdata = sio.loadmat(dataFileName)
-
-	time_o = vbdata['tDash'].reshape(-1,)
-	st_inp_o = vbdata['delta4'].reshape(-1,)
-	# st_inp_rad = st_inp_o*np.pi/180a
-	lat_acc_o = vbdata['ay1'].reshape(-1,)
-	lat_vel_o = vbdata['lat_vel'].reshape(-1,)
-	long_vel_o = vbdata['long_vel'].reshape(-1,)
-	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
-	psi_angle_o = vbdata['psi_angle'].reshape(-1,)
-
-
-
-
-	data = np.array([lat_vel_o,psi_angle_o,yaw_rate_o,lat_acc_o])
-
-
-
-	# Add all the noise
-	noOutputs= data.shape[0]
-	for i in range(noOutputs):
-		data[i,:] = add_noise(data[i,:])
+	with open(stName, 'rb') as f:
+		st_inp_o = np.load(f)
 
 
 	# The prediction

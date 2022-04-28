@@ -2,8 +2,8 @@
 
 python3 diag_plot.py "$1" "$2" > dump.txt
 
-#Print the first 2 lines as it is
-head -2 dump.txt
+#Print the first n lines as it is - these are the sample stat
+head -"$3" dump.txt
 
 
 #Remove those 2 lines from the file
