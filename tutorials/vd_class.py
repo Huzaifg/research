@@ -632,8 +632,8 @@ class vd_8dof:
 		v_dot=(E1*Jxz**2-A1*A2*E2+A1*E3*Jxz+A3*E2*Jxz-A2*E1*Jz-A3*E3*Jz)/(A2*A1**2-2*A1*A3*Jxz+Jz*A3**2+mt*Jxz**2-A2*Jz*mt)
 		wx_dot=(A1**2*E3-A1*A3*E2+A1*E1*Jxz-A3*E1*Jz+E2*Jxz*mt-E3*Jz*mt)/(A2*A1**2-2*A1*A3*Jxz+Jz*A3**2+mt*Jxz**2-A2*Jz*mt) 
 		wz_dot=(A3**2*E2-A1*A2*E1-A1*A3*E3+A3*E1*Jxz-A2*E2*mt+E3*Jxz*mt)/(A2*A1**2-2*A1*A3*Jxz+Jz*A3**2+mt*Jxz**2-A2*Jz*mt)
-		dx = u
-		dy = v
+		dx = u*np.cos(psi) - v*np.sin(psi)
+		dy = u*np.sin(psi) + v*np.cos(psi)
 
 
 		## Wheel rotational modelling
