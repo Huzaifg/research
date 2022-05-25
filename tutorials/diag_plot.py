@@ -25,8 +25,6 @@ If save is true, then the plots will also be saved in the ./images subdirectory
 def main():
 	filename = sys.argv[1]
 	save = sys.argv[2].lower() == 'true'
-	# Need to always keep changing these varnames which is a pain
-	var_names = ['Cf','Cr','m',"sigmaLat_acc","sigmaVy"]
 
 	#Read the data file
 	idata = az.from_netcdf('./results/' + filename + ".nc")
