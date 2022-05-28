@@ -155,7 +155,7 @@ for i in range(0,n):
 
 stop = time.time()
 print(f"time : {(stop-start)/n}")
-
+print(f"Number of iterations {outs['nfev']}")
 
 plot = True
 if(plot):
@@ -163,7 +163,9 @@ if(plot):
         mpl.plot(vehicle.t_arr,vehicle.xtrf_ar)
         mpl.ylabel("8 dof Tire deflection (m)")
         mpl.xlabel("Time (s)")
+        mpl.savefig("images/8dof_td_sci.png",facecolor = 'w')
         mpl.show()
+
         
 
         mpl.plot(time_,data['tiredef_lf'][n1:n2],'b')
@@ -174,7 +176,9 @@ if(plot):
         mpl.plot(vehicle.t_arr,vehicle.s_arr)
         mpl.ylabel("8 dof Longitudinal slip")
         mpl.xlabel("Time (s)")
+        mpl.savefig("images/8dof_ls_sci.png",facecolor = 'w')
         mpl.show()
+
 
         
         
@@ -188,6 +192,7 @@ if(plot):
         mpl.ylabel("8 dof Torques")
         mpl.legend(['drive','traction','rolling resistance','chrono spindle torque'])
         mpl.xlabel("Time")
+        mpl.savefig("images/8dof_tors_sci.png",facecolor = 'w')
         mpl.show()
 
 
@@ -200,6 +205,7 @@ if(plot):
         mpl.ylabel("8 dof Normal force")
         mpl.xlabel("Time (s)")
         mpl.legend(['lf','lr','rf','rr'])
+        mpl.savefig("images/8dof_nf_sci.png",facecolor = 'w')
         mpl.show()
         
 
@@ -220,6 +226,7 @@ if(plot):
     mpl.legend(['lf','lr','8 dof lf','8dof rf'])
     mpl.xlabel("Time (s)")
     mpl.ylabel("Angular velocity")
+    mpl.savefig("images/8dof_av_sci.png",facecolor = 'w')
     mpl.show()
 
 
@@ -232,4 +239,5 @@ if(plot):
     mpl.xlabel("Time (s)")
     mpl.ylabel("Longitudinal Velocity (m/s)")
     mpl.legend(['8dof','chrono'])
+    mpl.savefig("images/8dof_lv_sci.png",facecolor = 'w')
     mpl.show()
