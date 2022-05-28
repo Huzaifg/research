@@ -1410,7 +1410,7 @@ class vd_8dof:
         # For saving the results at t_eval
         count = 1
 
-        outs = np.empty((len(time_steps)+1,len(self.states)))
+        outs = np.empty((len(t_eval),len(self.states)))
         outs[0] = (np.array(list(self.states.values())))
         mts = []
 
