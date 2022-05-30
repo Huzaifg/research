@@ -1,4 +1,4 @@
-from vd_class_2 import vd_2dof,vd_8dof
+from vd_class import vd_2dof,vd_8dof
 from vd_8dof_mod import vehicle_8dof
 import numpy as np
 from scipy.integrate import solve_ivp,odeint
@@ -36,7 +36,7 @@ times = []
 
 
 ## Data
-data = pd.read_csv("rr_1.csv",sep=',',header='infer')
+data = pd.read_csv("brake_2.csv",sep=',',header='infer')
 
 
 
@@ -48,21 +48,27 @@ def zero_throt(t):
 def zero_st(t):
 	return 0 *t
 
-
+def zero_brake(t):
+    return 0 * t
 
 # n1  = 100
 # n2 = 850
-n1 = 560
-n2 = 1060
+# n1 = 560
+# n2 = 1060
 # n1 = 700
 # n2 = 1070
+n1 = 850
+n2 = 1250
+
 
 # st_time = 1.0
 # end_time = 8.5
-st_time = 0.
-end_time = 5.
+# st_time = 0.
+# end_time = 5.
 # st_time = 0.
 # end_time = 3.7
+st_time = 8.5
+end_time = 12.5
 t_eval  = np.arange(st_time,end_time,0.01)
 
 # print(data['time'][n1:n2])
@@ -94,8 +100,11 @@ def ramp_throt(t):
             return ramp_throt1(t)
         else:
             return ramp_throt2(t)
-# def tor(t):
-#     return np.where(t <4.5,200*t,-200*t)
+
+
+brake1 = Point(8.5,0)
+brake2 = Point(12.5,0.2)
+brake_tor1 = brake1.get_eq(brake2)
 
 # mpl.plot(ramp_throt(time_))
 # mpl.show()
@@ -113,6 +122,8 @@ steer = True
 vehicle.set_throttle(zero_throt)
 # vehicle.set_torque(tor)
 
+vehicle.set_braking(brake_tor1)
+
 
 # vehicle.update_states(x = data['x'][n1],y=0.,u=data['vx'][n1],v=0.,psi=0.,phi=0.,
 # wx=0.,wz=0.,
@@ -125,7 +136,7 @@ rtol_ar = [10e-2,10e-2,10e-2,10e-2,10e-2,10e-2,10e-2,10e-2,10e-8,10e-8,10e-8,10e
 atol_ar = [10e-3,10e-3,10e-4,10e-4,10e-4,10e-4,10e-4,10e-4,10e-10,10e-10,10e-10,10e-10]
 vehicle.update_params(m=2097.85,muf=127.866,mur=129.98,a= 1.6889,b =1.6889,h = 0.713,cf = 1.82,cr = 1.82,Jx = 1289,Jz = 4519,
 Jxz = 3.265,Cf=39000,Cr=48000,r0=0.47,
-	ktf=326332,ktr=326332,krof=31000.0,kror=31000.0,brof=3300.000,bror=3300.000,hrcf=0.379,hrcr=0.327,Jw=11,Cxf = 17000,Cxr = 17000,rr=0.0125)
+	ktf=326332,ktr=326332,krof=31000.0,kror=31000.0,brof=3300.000,bror=3300.000,hrcf=0.379,hrcr=0.327,Jw=11,Cxf = 17481,Cxr = 17700,rr=0.0130)
 
 
 # print(data['time'][n1],data['time'][n2])
@@ -140,7 +151,7 @@ for i in range(0,n):
 	# outs = solve_ivp(vehicle.model_tr,t_span=[time_[0],time_[-1]],y0 = list(vehicle.states.values()),method = 'RK45',t_eval = time_,
 	# rtol = rtol_ar,atol = atol_ar)
 	# vehicle.reset_state()
-    outs = vehicle.solve_half_impl(t_span = [t_eval[0],t_eval[-1]],t_eval = t_eval,tbar = 1e-2)
+    outs = vehicle.solve_half_impl(t_span = [t_eval[0],t_eval[-1]],t_eval = t_eval,tbar = 5e-3)
     #Reset the state if running multiple simulations
     # vehicle.reset_state(init_state=st)
 
@@ -227,8 +238,8 @@ if(plot):
     # Wheel rotational velocity comparisions
     mpl.figure(figsize=(10,10))
     mpl.title("Wheel rotational velocity")
-    mpl.plot(t_eval,data['wlf'][n1:n2],t_eval,data['wlr'][n1:n2],t_eval,outs[:,8],t_eval,outs[:,10])
-    mpl.legend(['lf','lr','8 dof lf','8dof rf'])
+    mpl.plot(t_eval,data['wlf'][n1:n2],t_eval,data['wlr'][n1:n2],t_eval,outs[:,8],t_eval,outs[:,9])
+    mpl.legend(['lf','lr','8 dof lf','8dof lr'])
     mpl.xlabel("Time (s)")
     mpl.ylabel("Angular velocity")
     # mpl.savefig("images/8dof_av_hi54.png",facecolor = 'w')

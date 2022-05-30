@@ -657,6 +657,11 @@ class vd_8dof:
         self.gear_ratio = gr
         self.max_torque = mt
         self.max_speed = ms
+	
+	#Sets the brake controls of the vehicle
+    def set_braking(self,brake,mbt = 4000):
+        self.brake = brake
+        self.max_brake_torque = mbt
 
     # Update the states externally after initilisation - Through dict or kwargs
     def update_states(self,state_dict = None, **kwargs):
@@ -744,6 +749,11 @@ class vd_8dof:
             (motor_speed * (self.max_torque / self.max_speed))
         motor_torque = motor_torque * self.throttle(t)
         return motor_torque / self.gear_ratio
+    
+    # Evaluate the brake torque at a paticular time step
+    def brake_torque(self,t):
+        return self.brake(t)*self.max_brake_torque
+
 
     # A utility function to stabilsie the initial transients
     def smooth_step(self, t, f1, t1, f2, t2):
@@ -903,15 +913,21 @@ class vd_8dof:
         rolling_res_lr = -rr * np.abs(Fzglr) * np.sign(wlr)
         rolling_res_rr = -rr * np.abs(Fzgrr) * np.sign(wrr)
 
+        # Brake Torques of each wheel
+        br_t_lf = - np.sign(wlf) * self.brake_torque(t)
+        br_t_rf = - np.sign(wrf) * self.brake_torque(t)
+        br_t_lr = - np.sign(wlr) * self.brake_torque(t)
+        br_t_rr = - np.sign(wrr) * self.brake_torque(t)
+
         # Tire rotational model
         dwlf = (1/Jw)*(self.drive_torque(t, wlf) /
-                       4 + rolling_res_lf - Fxtlf*Rlf)
+                       4 + rolling_res_lf + br_t_lf - Fxtlf*Rlf)
         dwrf = (1/Jw)*(self.drive_torque(t, wrf) /
-                       4 + rolling_res_rf - Fxtrf*Rrf)
+                       4 + rolling_res_rf + br_t_rf - Fxtrf*Rrf)
         dwlr = (1/Jw)*(self.drive_torque(t, wlr) /
-                       4 + rolling_res_lr - Fxtlr*Rlr)
+                       4 + rolling_res_lr + br_t_lr - Fxtlr*Rlr)
         dwrr = (1/Jw)*(self.drive_torque(t, wrr) /
-                       4 + rolling_res_rr - Fxtrr*Rrr)
+                       4 + rolling_res_rr + br_t_rr - Fxtrr*Rrr)
 
         return np.stack([dx, dy, u_dot, v_dot, dpsi, dphi, wx_dot, wz_dot, dwlf, dwlr, dwrf, dwrr])
 
@@ -1115,15 +1131,22 @@ class vd_8dof:
         rolling_res_lr = -rr * np.abs(self.Fzglr) * np.sign(wlr)*smth_rr
         rolling_res_rr = -rr * np.abs(self.Fzgrr) * np.sign(wrr)*smth_rr
 
+        # Brake Torques of each wheel
+        br_t_lf = - np.sign(wlf) * self.brake_torque(t)
+        br_t_rf = - np.sign(wrf) * self.brake_torque(t)
+        br_t_lr = - np.sign(wlr) * self.brake_torque(t)
+        br_t_rr = - np.sign(wrr) * self.brake_torque(t)
+
+
         # Wheel rotational model
         dwlf = (1/Jw)*(self.drive_torque(t, wlf) /
-                       4 + rolling_res_lf - Fxtlf*Rlf)
+                       4 + rolling_res_lf + br_t_lf - Fxtlf*Rlf)
         dwrf = (1/Jw)*(self.drive_torque(t, wrf) /
-                       4 + rolling_res_rf - Fxtrf*Rrf)
+                       4 + rolling_res_rf + br_t_rf- Fxtrf*Rrf)
         dwlr = (1/Jw)*(self.drive_torque(t, wlr) /
-                       4 + rolling_res_lr - Fxtlr*Rlr)
+                       4 + rolling_res_lr + br_t_lr - Fxtlr*Rlr)
         dwrr = (1/Jw)*(self.drive_torque(t, wrr) /
-                       4 + rolling_res_rr - Fxtrr*Rrr)
+                       4 + rolling_res_rr + br_t_rr - Fxtrr*Rrr)
 
         # The normal forces at four tires are determined as in order to update the tire compression for the next time step
         Z1 = (m*g*b)/(2*(a+b))+(muf*g)/2
@@ -1373,11 +1396,17 @@ class vd_8dof:
         rolling_res_lr = -rr * np.abs(self.Fzglr) * np.sign(wlr)*smth_rr
         rolling_res_rr = -rr * np.abs(self.Fzgrr) * np.sign(wrr)*smth_rr
 
+        # Brake Torques of each wheel
+        br_t_lf = - np.sign(wlf) * self.brake_torque(t)
+        br_t_rf = - np.sign(wrf) * self.brake_torque(t)
+        br_t_lr = - np.sign(wlr) * self.brake_torque(t)
+        br_t_rr = - np.sign(wrr) * self.brake_torque(t)
+
         # Wheel rotational model
-        dwlf=(1/Jw)*(self.drive_torque(t,wlf)/4 + rolling_res_lf - Fxtlf*Rlf)
-        dwrf=(1/Jw)*(self.drive_torque(t,wrf)/4 + rolling_res_rf - Fxtrf*Rrf)
-        dwlr=(1/Jw)*(self.drive_torque(t,wlr)/4 + rolling_res_lr - Fxtlr*Rlr)
-        dwrr=(1/Jw)*(self.drive_torque(t,wrr)/4 + rolling_res_rr - Fxtrr*Rrr)
+        dwlf=(1/Jw)*(self.drive_torque(t,wlf)/4 + rolling_res_lf + br_t_lf - Fxtlf*Rlf)
+        dwrf=(1/Jw)*(self.drive_torque(t,wrf)/4 + rolling_res_rf + br_t_rf - Fxtrf*Rrf)
+        dwlr=(1/Jw)*(self.drive_torque(t,wlr)/4 + rolling_res_lr + br_t_lr - Fxtlr*Rlr)
+        dwrr=(1/Jw)*(self.drive_torque(t,wrr)/4 + rolling_res_rr + br_t_rr - Fxtrr*Rrr)
 
 
         if(self.debug):
@@ -1505,6 +1534,13 @@ class vd_8dof:
 
         if t_eval is None:
             raise Exception("Please provide times steps at which you want the solution to be evaluated")
+
+        try:
+            self.brake
+        except:
+            def zero_brake(t):
+                return 0*t
+            self.brake = zero_brake
 
         # Need the start time for the smoothing function
         self.start_time = t_eval[0]
