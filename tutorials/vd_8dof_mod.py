@@ -2,8 +2,8 @@
 import numpy as np
 from math import atan,cos,sin
 from scipy.integrate import solve_ivp
-import warnings
-warnings.filterwarnings("error")
+# import warnings
+# warnings.filterwarnings("error")
 
 
 def vehicle_8dof(theta,tt,st_input,init_cond):
@@ -17,7 +17,7 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
 
     theta : 
         A list of all the parameters of the model. These are also all the parameters that are inferred from the bayesian inference. 
-        Need to find a way to pass a dict - list is too error prone
+        Need to find a way to pass a dict - list is too error prone - pymc3 only takes lists
     tt :
         Time intervals at which the "data" is "collected"
 
@@ -27,37 +27,73 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
     init_cond:
         These are the initial conditions of the vehicle.
 
+
+    Returns:
+    -------
+    
+    mod_data :
+        Matrix with size (no_of_outputs X no_of_timesteps) ---- ex. row 0 of mod_data is the longitudanal veclocity vector at each time step
+
+
     """
 
     ### Our model parameters, some are sampled some are not
 
-    m=theta[0]  # Sprung mass (kg)
-    Jx=theta[1]   # Sprung mass roll inertia (kg.m^2)
-    Jy=theta[2]   # Sprung mass pitch inertia (kg.m^2)
-    Jz=theta[3]   # Sprung mass yaw inertia (kg.m^2)
-    a=theta[4]   # Distance of sprung mass c.g. from front axle (m)
-    b=theta[5]   # Distance of sprung mass c.g. from rear axle (m)
-    Jxz=theta[6]   # Sprung mass XZ product of inertia
-    Jw=theta[7]     #tire/wheel roll inertia kg.m^2
-    g=theta[8]    # acceleration of gravity 
-    h=theta[9]    # Sprung mass c.g. height (m)
-    cf=theta[10]    # front track width (m)
-    cr=theta[11]    # rear track width (m)
-    muf=theta[12]      #front unsprung mass (kg)
-    mur=theta[13]      #rear unsprung mass (kg)
-    ktf=theta[14]    #front tire stiffness (N/m)
-    ktr=theta[15]    #rear tire stiffness (N/m)
-    Cf=theta[16]   #front tire cornering stiffness (N/rad)
-    Cr=theta[17]   #rear tire cornering stiffness (N/rad)
-    Cxf=theta[18]   #front tire longitudinal stiffness (N)
-    Cxr=theta[19]   #rear tire longitudinal stiffness (N)
-    r0=theta[20]   #nominal tire radius (m)
-    hrcf=theta[21]   #front roll center distance below sprung mass c.g.
-    hrcr=theta[22]    #rear roll center distance below sprung mass c.g.
-    krof=theta[23]   #front roll stiffness (Nm/rad)
-    kror=theta[24]   #rear roll stiffness (Nm/rad)
-    brof=theta[25]    #front roll damping coefficient (Nm.s/rad)
-    bror=theta[26]    #rear roll damping coefficient (Nm.s/rad)
+    # m=theta[0]  # Sprung mass (kg)
+    # Jx=theta[1]   # Sprung mass roll inertia (kg.m^2)
+    # Jy=theta[2]   # Sprung mass pitch inertia (kg.m^2)
+    # Jz=theta[3]   # Sprung mass yaw inertia (kg.m^2)
+    # a=theta[4]   # Distance of sprung mass c.g. from front axle (m)
+    # b=theta[5]   # Distance of sprung mass c.g. from rear axle (m)
+    # Jxz=theta[6]   # Sprung mass XZ product of inertia
+    # Jw=theta[7]     #tire/wheel roll inertia kg.m^2
+    # g=theta[8]    # acceleration of gravity 
+    # h=theta[9]    # Sprung mass c.g. height (m)
+    # cf=theta[10]    # front track width (m)
+    # cr=theta[11]    # rear track width (m)
+    # muf=theta[12]      #front unsprung mass (kg)
+    # mur=theta[13]      #rear unsprung mass (kg)
+    # ktf=theta[14]    #front tire stiffness (N/m)
+    # ktr=theta[15]    #rear tire stiffness (N/m)
+    # Cf=theta[16]   #front tire cornering stiffness (N/rad)
+    # Cr=theta[17]   #rear tire cornering stiffness (N/rad)
+    # Cxf=theta[18]   #front tire longitudinal stiffness (N)
+    # Cxr=theta[19]   #rear tire longitudinal stiffness (N)
+    # r0=theta[20]   #nominal tire radius (m)s
+    # hrcf=theta[21]   #front roll center distance below sprung mass c.g.
+    # hrcr=theta[22]    #rear roll center distance below sprung mass c.g.
+    # krof=theta[23]   #front roll stiffness (Nm/rad)
+    # kror=theta[24]   #rear roll stiffness (Nm/rad)
+    # brof=theta[25]    #front roll damping coefficient (Nm.s/rad)
+    # bror=theta[26]    #rear roll damping coefficient (Nm.s/rad)
+
+    m = 1400
+    Jx = 900  # Sprung mass roll inertia (kg.m^2)
+    Jy  = 2000
+    Jz = 2420
+    a = 1.14
+    b = 1.4
+    Jxz = 90
+    Jw = 1
+    g = 9.8
+    h = 0.75
+    cf = 1.5
+    cr = 1.5
+    muf = 80
+    mur = 80
+    ktf = 200000
+    ktr = 200000
+    Cf = theta[0]
+    Cr = theta[1]
+    Cxf = 5000
+    Cxr = 5000
+    r0 = 0.285
+    hrcf = 0.65
+    hrcr = 0.6
+    krof = 29000
+    kror = 29000
+    brof = 3000
+    bror = 3000
 
 
     ### The initial conditions
@@ -101,7 +137,15 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
     delta4 = st_input
 
     long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay = (np.zeros(Tsim) for _ in range(8))
-
+    
+    #For the first time step
+    long_vel[0] = u
+    long_acc[0] = u_dot
+    roll_angle[0] = phi
+    lat_acc[0] = v_dot
+    lat_vel[0] = v
+    psi_angle[0] = psi
+    yaw_rate[0] = dpsi
 
 
     ### Run the simulation - scary equations 
@@ -193,36 +237,33 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
 
         ## Solving the ODEs, the solutions differ a bit from Matlab at end time
         ts = np.arange((i)*delt,(i+1)*delt,delt/10)
-        sol = solve_ivp(lambda t,psi: dpsi,(ts[0],ts[-1]),[psi],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,psi: dpsi,(ts[0],ts[-1]),[psi],method = 'RK45',rtol=1e-4, atol=1e-8)
         psi = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,phi: dphi,(ts[0],ts[-1]),[phi],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,phi: dphi,(ts[0],ts[-1]),[phi],method = 'RK45',rtol=1e-4, atol=1e-8)
         phi = sol.y[-1][-1]
-        sol= solve_ivp(lambda t,u: u_dot,(ts[0],ts[-1]),[u],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol= solve_ivp(lambda t,u: u_dot,(ts[0],ts[-1]),[u],method = 'RK45',rtol=1e-4, atol=1e-8)
         u = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,v: v_dot,(ts[0],ts[-1]),[v],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,v: v_dot,(ts[0],ts[-1]),[v],method = 'RK45',rtol=1e-4, atol=1e-8)
         v = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,wx: wx_dot,(ts[0],ts[-1]),[wx],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,wx: wx_dot,(ts[0],ts[-1]),[wx],method = 'RK45',rtol=1e-4, atol=1e-8)
         wx = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,wz: wz_dot,(ts[0],ts[-1]),[wz],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,wz: wz_dot,(ts[0],ts[-1]),[wz],method = 'RK45',rtol=1e-4, atol=1e-8)
         wz = sol.y[-1][-1]
         dpsi=wz
         dphi=wx
         ## Wheel rotational modelling
-        try:
-            dwlf=-(1/Jw)*Fxtlf*Rlf
-            dwrf=-(1/Jw)*Fxtrf*Rrf
-            dwlr=-(1/Jw)*Fxtlr*Rlr
-            dwrr=-(1/Jw)*Fxtrr*Rrr
-        except:
-            print(Jw,Fxtlf,Rlf)
+        dwlf=-(1/Jw)*Fxtlf*Rlf
+        dwrf=-(1/Jw)*Fxtrf*Rrf
+        dwlr=-(1/Jw)*Fxtlr*Rlr
+        dwrr=-(1/Jw)*Fxtrr*Rrr
         ## Solving the related ODE's
-        sol = solve_ivp(lambda t,wlf: dwlf,(ts[0],ts[-1]),[wlf],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,wlf: dwlf,(ts[0],ts[-1]),[wlf],method = 'RK45',rtol=1e-4, atol=1e-8)
         wlf = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,wrf: dwrf,(ts[0],ts[-1]),[wrf],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,wrf: dwrf,(ts[0],ts[-1]),[wrf],method = 'RK45',rtol=1e-4, atol=1e-8)
         wrf = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,wlr: dwlr,(ts[0],ts[-1]),[wlr],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,wlr: dwlr,(ts[0],ts[-1]),[wlr],method = 'RK45',rtol=1e-4, atol=1e-8)
         wlr = sol.y[-1][-1]
-        sol = solve_ivp(lambda t,wrr: dwrr,(ts[0],ts[-1]),[wrr],t_eval = ts,method = 'RK45',rtol=1e-4, atol=1e-8)
+        sol = solve_ivp(lambda t,wrr: dwrr,(ts[0],ts[-1]),[wrr],method = 'RK45',rtol=1e-4, atol=1e-8)
         wrr = sol.y[-1][-1]
         ind = i + 1
         long_vel[ind]=u
@@ -235,8 +276,12 @@ def vehicle_8dof(theta,tt,st_input,init_cond):
         ## vehicle lateral acceleration
         ay[ind]=u*wz+v_dot
 
-        #For now lets just return one of the vectors, we will first work on just using one of the outputs for the bayesian inference
-    return yaw_rate.reshape(-1,)
+    #For now lets just return one of the vectors, we will first work on just using one of the outputs for the bayesian inference
+    # mod_data = np.array([long_vel,long_acc,roll_angle,lat_acc,lat_vel,psi_angle,yaw_rate,ay])
+    # mod_data = np.array([roll_angle,ay,yaw_rate,lat_vel,psi_angle,long_vel])
+    mod_data = np.array([lat_vel*100,psi_angle,yaw_rate,ay])
+
+    return mod_data
 
 
 
