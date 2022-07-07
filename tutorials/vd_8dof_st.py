@@ -20,7 +20,7 @@ import time
 def loglike(theta,data):
 
     sigmas = np.array(theta[-(data.shape[0]):]).reshape(-1,1)
-
+    # sigmas = np.array([0.038,0.003,0.0015,0.015]).reshape(-1,1)
 	#Need to update the parameters using the update params method
     vehicle.update_params(Cf=theta[0],Cr=theta[1],krof=theta[2],kror=theta[3],brof=theta[4],bror=theta[5],m=2097.85,muf=127.866,mur=129.98,a= 1.6889,b =1.6889,h = 0.713,cf = 1.82,cr = 1.82,Jx = 1289,Jz = 4519,Jxz = 3.265,
     r0=0.47,ktf=326332,ktr=326332,hrcf=0.379,hrcr=0.327,Jw=11,
@@ -33,6 +33,24 @@ def loglike(theta,data):
     vehicle.reset_state(init_state=st)
 
     return -np.sum(np.sum((mod[[3,5,6,7],:] - data)**2/(2.*sigmas**2))/np.linalg.norm(data,axis = 1))
+
+# def loglike(theta,data):
+
+#     # sigmas = np.array(theta[-(data.shape[0]):]).reshape(-1,1)
+#     sigmas = np.array([0.038,0.003,0.0015,0.015]).reshape(-1,1)
+#     n = data.shape[1]
+# 	#Need to update the parameters using the update params method
+#     vehicle.update_params(Cf=theta[0],Cr=theta[1],krof=theta[2],kror=theta[3],brof=theta[4],bror=theta[5],m=2097.85,muf=127.866,mur=129.98,a= 1.6889,b =1.6889,h = 0.713,cf = 1.82,cr = 1.82,Jx = 1289,Jz = 4519,Jxz = 3.265,
+#     r0=0.47,ktf=326332,ktr=326332,hrcf=0.379,hrcr=0.327,Jw=11,
+#     Cxf = 17000,Cxr = 17000,rr=0.0125)
+
+
+#     mod = vehicle.solve_half_impl(t_span = [t_eval[0],t_eval[-1]],t_eval = t_eval,tbar = 1e-2)
+#     mod = np.transpose(mod)
+
+#     vehicle.reset_state(init_state=st)
+
+#     return -np.sum(((n*np.log(2*np.pi * sigmas**2)/2) + np.sum((mod[[3,5,6,7],:] - data)**2/(2.*sigmas**2)))/np.linalg.norm(data,axis = 1))
 
 #The gradient of the log likelihood using finite differences - Needed for gradient based methods
 def grad_loglike(theta,data):
@@ -109,24 +127,26 @@ def main():
 
         Cf = pm.Uniform("Cf",lower=20000,upper=80000,initval = 40000)
         Cr = pm.Uniform("Cr",lower=20000,upper=80000,initval = 40000)
-        krof = pm.Uniform("krof",lower=5000,upper=80000,initval = 20000)
-        # kror = pm.Uniform("kror",lower=5000,upper=80000,initval = 20000)
-        k = pm.Uniform("k",lower = 0.5,upper = 1.5,initval = 1)
-        kror = pm.Deterministic('kror',k*krof)
+        krof = pm.Uniform("krof",lower=1000,upper=50000,initval = 20000)
+        kror = pm.Uniform("kror",lower=1000,upper=50000,initval = 20000)
+        # k = pm.Uniform("k",lower = 0.5,upper = 1.5,initval = 1)
+        # kror = pm.Deterministic('kror',k*krof)
         brof = pm.Uniform("brof",lower=100,upper=30000,initval = 2000)
-        # bror = pm.Uniform("bror",lower=100,upper=30000,initval = 2000)
-        b = pm.Uniform("b",lower = 0.5,upper = 1.5,initval = 1)
-        bror = pm.Deterministic('bror',b*brof)
-        sigmaRA = pm.HalfNormal("sigmaRA",sigma = 0.008,initval=0.008)
-        sigmaRR = pm.HalfNormal("sigmaRR",sigma = 0.003,initval=0.003)
-        sigmaLV = pm.HalfNormal("sigmaLV",sigma = 0.009,initval=0.003)
-        sigmaYR = pm.HalfNormal("sigmaYR",sigma = 0.03,initval=0.03)
+        bror = pm.Uniform("bror",lower=100,upper=30000,initval = 2000)
+        # b = pm.Uniform("b",lower = 0.5,upper = 1.5,initval = 1)
+        # bror = pm.Deterministic('bror',b*brof)
+        
+        sigmaRA = pm.HalfNormal("sigmaRA",sigma = 0.005,initval=0.003)
+        sigmaRR = pm.HalfNormal("sigmaRR",sigma = 0.005,initval=0.0015)
+        sigmaLV = pm.HalfNormal("sigmaLV",sigma = 0.05,initval=0.03)
+        sigmaYR = pm.HalfNormal("sigmaYR",sigma = 0.05,initval=0.015)
 
 
         ## All of these will be a tensor 
         # theta_ = [mass,Jx,Jy,Jz,a,b,Jxz,Jw,g,h,cf,cr,muf,mur,ktf,ktr,Cf,Cr,Cxf,Cxr,r0,hrcf,hrcr,krof,kror,brof,bror,sigmaLat_acc,sigmaVy]
 
         theta_ = [Cf,Cr,krof,kror,brof,bror,sigmaLV,sigmaRA,sigmaRR,sigmaYR]
+        # theta_ = [Cf,Cr,krof,kror,brof,bror]
         theta = tt.as_tensor_variable(theta_)
 
         pm.Potential("like",like(theta))
@@ -137,10 +157,10 @@ def main():
         if(sys.argv[2] == "nuts"):
             # step = pm.NUTS()
             # pm.sampling.init_nuts()
-            idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
+            idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.85, cores=4)
         elif(sys.argv[2] == "met"):
             step = pm.Metropolis()
-            idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=4)
+            idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=8)
         elif(sys.argv[2] == "smc"):
             idata = pm.sample_smc(draws = ndraws,parallel=True,cores=8,return_inferencedata=True,progressbar = True)
         else:
@@ -174,7 +194,7 @@ if __name__ == "__main__":
     n2 = 1070
 
 
-    # The time duration of the simulation
+    # The time duration of the simulation-
     st_time = 0.
     end_time = 3.7
 
@@ -185,6 +205,8 @@ if __name__ == "__main__":
     def zero_throt(t):
         return 0 * t
 
+    def brake_tor(t):
+        return 0 * t
 
     state = pd.read_csv("simp_ramp.csv",sep=',',header='infer')
 
@@ -197,5 +219,6 @@ if __name__ == "__main__":
     # Set the steering and the throttle functions we just created above
     vehicle.set_steering(ramp_st_3)
     vehicle.set_throttle(zero_throt,gr=0.3*0.2)
+    vehicle.set_braking(brake_tor)
     vehicle.debug = 0
     main()

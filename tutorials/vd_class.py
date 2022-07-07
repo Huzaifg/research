@@ -29,6 +29,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.#
 
 
+from turtle import st
 import warnings
 import numpy as np
 import types
@@ -41,6 +42,29 @@ This file contains a class implementation of 2dof and 8dof vehicle models
 
 class vd_2dof:
     def __init__(self, parameters=None, states=None):
+        self.g = 9.8 # Gravitational forces
+
+        # Friction parameters for the tire model
+        self.umin = 0.5568
+        self.umax = 0.9835
+        # Relaxataion lengths - not used
+        self.xrel = 1.0
+        self.yrel = 1.0
+
+        # The smoothing time - Commented out currently
+        self.trans_time = 0.2
+
+        # Debug arrays
+        self.t_arr = []
+        self.ff = []
+        self.fr = []
+        self.dt = []
+        self.fdt= []
+        self.rdt= []
+        self.s_arr= []
+        self.xtf_ar= []
+
+        self.debug = 0
         if parameters is not None:
             if isinstance(parameters, list):
                 raise Exception(
@@ -60,17 +84,24 @@ class vd_2dof:
                 warnings.warn(
                     f"Set 'b' to default value {self.b}", UserWarning)
             try:
+                # height of c.g. from ground (m)
+                self.h = parameters['h']
+            except:
+                self.h = 0.713
+                warnings.warn(
+                    f"Set 'h' to default value {self.h}", UserWarning)
+            try:
                 # front axle cornering stiffness (N/rad)
                 self.Cf = parameters['Cf']
             except:
-                self.Cf = -88000
+                self.Cf = 88000
                 warnings.warn(
                     f"Set 'Cf' to default value {self.Cf}", UserWarning)
             try:
                 # rear axle cornering stiffness (N/rad)
                 self.Cr = parameters['Cr']
             except:
-                self.Cr = -88000
+                self.Cr = 88000
                 warnings.warn(
                     f"Set 'Cr' to default value {self.Cr}", UserWarning)
             try:
@@ -88,46 +119,86 @@ class vd_2dof:
                 warnings.warn(
                     f"Set 'Cxr' to default value {self.Cxr}", UserWarning)
             try:
+                # tire stiffness - front
+                self.ktf = parameters['ktf']
+            except:
+                self.ktf = 326332
+                warnings.warn(
+                    f"Set 'ktf' to default value {self.ktf}", UserWarning)
+            try:
+                # tire stiffness - rear
+                self.ktr = parameters['ktr']
+            except:
+                self.ktr = 326332
+                warnings.warn(
+                    f"Set 'ktr' to default value {self.ktr}", UserWarning)
+            try:
                 self.m = parameters['m']  # the mass of the vehicle (kg)
             except:
                 self.m = 1720
                 warnings.warn(
                     f"Set 'm' to default value {self.m}", UserWarning)
             try:
-                self.Iz = parameters['Iz']  # yaw moment of inertia (kg.m^2)
+                self.muf = parameters['muf']  # the front unsprung mass
             except:
-                self.Iz = 2420
+                self.muf = 1720
                 warnings.warn(
-                    f"Set 'Iz' to default value {self.Iz}", UserWarning)
+                    f"Set 'muf' to default value {self.muf}", UserWarning)
             try:
-                self.Rr = parameters['Rr']  # wheel radius
+                self.mur = parameters['mur']  # the rear unsprung mass
             except:
-                self.Rr = 0.285
+                self.mur = 1720
                 warnings.warn(
-                    f"Set 'Rr' to default value {self.Rr}", UserWarning)
+                    f"Set 'mur' to default value {self.mur}", UserWarning)
+
+            try:
+                self.Jz = parameters['Jz']  # yaw moment of inertia (kg.m^2)
+            except:
+                self.Jz = 2420
+                warnings.warn(
+                    f"Set 'Jz' to default value {self.Jz}", UserWarning)
+            try:
+                self.r0 = parameters['r0']  # wheel radius
+            except:
+                self.r0 = 0.285
+                warnings.warn(
+                    f"Set 'r0' to default value {self.r0}", UserWarning)
             try:
                 self.Jw = parameters['Jw']  # wheel roll inertia
             except:
                 self.Jw = 2
                 warnings.warn(
                     f"Set 'Jw' to default value {self.Jw}", UserWarning)
+            try:
+                self.rr = parameters['rr']  # wheel roll inertia
+            except:
+                self.rr = 0.0125
+                warnings.warn(
+                    f"Set 'rr' to default value {self.rr}", UserWarning)
+
             # A dictionary of parameters
-            self.params = {"a": self.a, "b": self.b, "Cf": self.Cf, "Cr": self.Cr, "Cxf": self.Cxf,
-                           "Cxr": self.Cxr, "m": self.m, "Iz": self.Iz, "Rr": self.Rr, "Jw": self.Jw}
+            self.params = {"a": self.a, "b": self.b, "h": self.h, "Cf": self.Cf, "Cr": self.Cr, "Cxf": self.Cxf, "Cxr": self.Cxr,"ktf": self.ktf,
+                           "ktr": self.ktr, "m": self.m, "muf": self.muf, "mur": self.mur, "Jz": self.Jz, "r0": self.r0, "Jw": self.Jw, "rr": self.rr}
         else:
             self.a = 1.14  # distance of c.g. from front axle (m)
             self.b = 1.4  # distance of c.g. from rear axle  (m)
-            self.Cf = -88000  # front axle cornering stiffness (N/rad)
-            self.Cr = -88000  # rear axle cornering stiffness (N/rad)
+            self.h = 0.713 # height of c.g. from the ground (m)
+            self.Cf = 88000  # front axle cornering stiffness (N/rad)
+            self.Cr = 88000  # rear axle cornering stiffness (N/rad)
             self.Cxf = 10000  # front axle longitudinal stiffness (N)
             self.Cxr = 10000  # rear axle longitudinal stiffness (N)
+            self.ktf = 326332 # tire stiffness - front (N/m)
+            self.ktr = 326332 # tire stiffmess - rear (N/m)
             self.m = 1720  # the mass of the vehicle (kg)
-            self.Iz = 2420  # yaw moment of inertia (kg.m^2)
-            self.Rr = 0.285  # wheel radius
+            self.muf = 120 # the front unsprung mass (kg)
+            self.mur = 120 # the rear unsprung mass (kg)
+            self.Jz = 2420  # yaw moment of inertia (kg.m^2)
+            self.r0 = 0.285  # wheel radius
             self.Jw = 2  # wheel roll inertia
+            self.rr = 0.0125 # Rolling resistance
             # A dictionary of parameters
-            self.params = {'a': self.a, 'b': self.b, 'Cf': self.Cf, 'Cr': self.Cr, 'Cxf': self.Cxf,
-                           'Cxr': self.Cxr, 'm': self.m, 'Iz': self.Iz, 'Rr': self.Rr, 'Jw': self.Jw}
+            self.params = {"a": self.a, "b": self.b, "h": self.h, "Cf": self.Cf, "Cr": self.Cr, "Cxf": self.Cxf, "Cxr": self.Cxr,"ktf": self.ktf,
+                           "ktr": self.ktr, "m": self.m, "muf": self.muf, "mur": self.mur, "Jz": self.Jz, "r0": self.r0, "Jw": self.Jw, "rr": self.rr}
             warnings.warn("Set parameters to default values" +
                           '\n' + f"{self.params}", UserWarning)
 
@@ -136,6 +207,18 @@ class vd_2dof:
                 raise Exception("Please provide a dictionary for the states")
 
             # State of the vehicle
+            try:
+                self.x = states['x']  # lateral velocity
+            except:
+                self.x = 0.
+                warnings.warn(
+                    f"Set 'x' to default value {self.x}", UserWarning)
+            try:
+                self.y = states['y']  # lateral velocity
+            except:
+                self.y = 0.
+                warnings.warn(
+                    f"Set 'y' to default value {self.y}", UserWarning)
             try:
                 self.Vy = states['Vy']  # lateral velocity
             except:
@@ -148,6 +231,12 @@ class vd_2dof:
                 self.Vx = 50./3.6
                 warnings.warn(
                     f"Set 'Vx' to default value {self.Vx}", UserWarning)
+            try:
+                self.psi = states['psi']  # yaw rate
+            except:
+                self.psi = 0.
+                warnings.warn(
+                    f"Set 'psi' to default value {self.psi}", UserWarning)
             try:
                 self.psi_dot = states['psi_dot']  # yaw rate
             except:
@@ -167,44 +256,82 @@ class vd_2dof:
                 warnings.warn(
                     f"Set 'wr' to default value {self.wr}", UserWarning)
             # A dictionary of states
-            self.states = {'Vy': self.Vy, 'Vx': self.Vx,
+            self.states = {'x' : self.x,'y':self.y,'Vx': self.Vx, 'Vy': self.Vy,'psi' : self.psi,
                            'psi_dot': self.psi_dot, 'wf': self.wf, 'wr': self.wr}
         else:
             # State of the vehicle
+            self.x = 0. # x coordinate
+            self.y = 0. # y coordinate
             self.Vy = 0.  # lateral velocity
             self.Vx = 50./3.6  # longitudinal velocity
+            self.psi = 0. # Yaw angle
             self.psi_dot = 0.  # yaw rate
             self.wf = 50./(3.6 * 0.285)  # Front wheel angular velocity
             self.wr = 50./(3.6 * 0.285)  # Rear wheel angular velocity
             # A dictionary of states
-            self.states = {'Vy': self.Vy, 'Vx': self.Vx,
+            self.states = {'x' : self.x,'y':self.y,'Vx': self.Vx, 'Vy': self.Vy,'psi' : self.psi,
                            'psi_dot': self.psi_dot, 'wf': self.wf, 'wr': self.wr}
             warnings.warn("Set States to default values" +
                           '\n' + f"{self.states}", UserWarning)
+        
+        # Vertical forces initially
+        self.Fzgf = ((self.m*self.g*self.b) /
+                        (2*(self.a+self.b))+self.muf*self.g) # front
+        self.Fzgr = ((self.m*self.g*self.b) /
+                        (2*(self.a+self.b))+self.mur*self.g) # rear
+
+        # the initial tire compression xt
+        self.xtf = self.Fzgf/self.ktf  # front
+        self.xtr = self.Fzgr/self.ktr # rear
 
 
     # Simple print to show the parameters and states
     def __str__(self):
         return str(self.__class__) + '\n' + "Vehicle Parameters are" + '\n' + f"{self.params}" + '\n' + "Vehicle state is" + '\n' + f"{self.states}"
 
-    # Sets the controls for the vehicle
-    def set_steering(self, steering):
-        if(isinstance(steering, types.FunctionType)):
-            self.steering = steering
+    # Sets the steering of the vehicle
+    def set_steering(self, steering, max_steering=0.6525249):
+        """
+        Takes as input a normalised steering function from -1 to 1 and a max steering value in radians. +ve is a left turn
+        """
+        # Pitman arm
+        # self.max_steer = 0.7328647
+        self.steering = steering
+        self.max_steer = max_steering
+
+    # Sets the throttle controls of the vehicle
+    def set_throttle(self, throttle, gr=0.3*0.2, mt=1000., ms=2000.):
+        """
+        Takes as input a normalised throttle fron -1 to 1, a gear ratio, a max torque(Nm) and a max speed (RPS?)
+	    The throttle is then applied in the drive_torque function along with the other paramters
+        """
+        # The 0.2 is from the conical gears of the chrono vehicle
+        self.throttle = throttle
+        self.gear_ratio = gr
+        self.max_torque = mt
+        self.max_speed = ms
+	
+	#Sets the brake controls of the vehicle
+    def set_braking(self,brake,mbt = 4000):
+        self.brake = brake
+        self.max_brake_torque = mbt
+
+
+    # Update the states externally after initilisation - Through dict or kwargs
+    def update_states(self,state_dict = None, **kwargs):
+        if(state_dict == None):
+            for key, value in kwargs.items():
+                if(key not in self.states):
+                    raise Exception(f"{key} is not vehicle state")
+
+                # Set the state to the respective class attribute
+                setattr(self, key, value)
+                # Update the states dict attribute as well
+                self.states[key] = value
         else:
-            raise Exception(
-                f"The controls provided should be of type {types.FunctionType}. It should also be a function of time")
+            for key,value in state_dict.items():
+                self.states[key] = value
 
-    # Update the states
-    def update_states(self, **kwargs):
-        for key, value in kwargs.items():
-            if(key not in self.states):
-                raise Exception(f"{key} is not vehicle state")
-
-            # Set the state to the respective class attribute
-            setattr(self, key, value)
-            # Update the states dict attribute as well
-            self.states[key] = value
 
     # Update the parameters
     def update_params(self, **kwargs):
@@ -225,47 +352,504 @@ class vd_2dof:
     def get_states(self):
         return self.states
 
-    # returns the differential equations of the model - Private method for now
-    def model(self, t, state):
-        a, b, Cf, Cr, Cxf, Cxr, m, Iz, Rr, Jw = list(self.params.values())
-        Vy, Vx, psi_dot, wf, wr = state
 
-        # Some preliminaries used in the ODE's
-        sf = (Rr*wf-(Vx*np.cos(self.steering(t))+(Vy+a*psi_dot)*np.sin(self.steering(t)))) / \
-            np.abs(Vx*np.cos(self.steering(t)) +
-                   (Vy+a*psi_dot)*np.sin(self.steering(t)))
+    # Just a method to reset the state to default values or values specified when vehicle object was created
+    # Needed for running multiple simulations
+    def reset_state(self,init_state):
+        for key,value in init_state.items():
+            self.states[key] = value
+
+        # Vertical forces initially
+        self.Fzgf = ((self.m*self.g*self.b) /
+                        (2*(self.a+self.b))+self.muf*self.g) # front
+        self.Fzgr = ((self.m*self.g*self.b) /
+                        (2*(self.a+self.b))+self.mur*self.g) # rear
+
+        # the initial tire compression xt
+        self.xtf = self.Fzgf/self.ktf  # front
+        self.xtr = self.Fzgr/self.ktr # rear
+
+
+        if(self.debug):
+            self.t_arr = []
+            self.ff = []
+            self.fr = []
+            self.dt = []
+            self.fdt= []
+            self.rdt= []
+            self.s_arr= []
+            self.xtf_ar= []
+
+    # Evaluate the drive torque based on the wheel speed - Similar to 4 motors on each of the wheels
+    def drive_torque(self, t, w):
+        motor_speed = w / self.gear_ratio
+        motor_torque = self.max_torque - \
+            (motor_speed * (self.max_torque / self.max_speed))
+        motor_torque = motor_torque * self.throttle(t)
+        return motor_torque / self.gear_ratio
+    
+    # Evaluate the brake torque at a paticular time step
+    def brake_torque(self,t):
+        return self.brake(t)*self.max_brake_torque
+
+
+    # A utility function to stabilsie the initial transients
+    def smooth_step(self, t, f1, t1, f2, t2):
+        if(t < t1):
+            return f1
+        elif(t >= t2):
+            return f2
+        else:
+            return f1 + ((f2 - f1)*((t-t1)/(t2-t1))**2 * (3 - 2*((t - t1)/(t2-t1))))
+
+    # returns the differential equations of the model for a linear tire
+    def model_linear(self, t, state):
+        g = self.g
+        a, b, h, Cf, Cr, Cxf, Cxr, ktf, ktr, m, muf, mur, Jz, r0, Jw, rr = list(self.params.values())
+        x, y, Vx, Vy, psi, psi_dot, wf, wr = state
+
+        mt=m+2*muf+2*mur # vehicle total mass
+        # instataneous tire radius
+        Rf=r0-self.xtf
+        Rr=r0-self.xtr
+        huf = Rf
+        hur = Rr
+
+        st_a = self.steering(t) * self.max_steer
+        # Longitudinal slip
+        sf = (Rf*wf-(Vx*np.cos(st_a)+(Vy+a*psi_dot)*np.sin(st_a))) / \
+            np.abs(Vx*np.cos(st_a) +
+                   (Vy+a*psi_dot)*np.sin(st_a))
         sr = (Rr*wr-Vx)/np.abs(Vx)
+
+        # Lateral slip
+        delta_f = np.arctan2((Vy+a*psi_dot),Vx)-(st_a)
+        delta_r = np.arctan2((Vy-b*psi_dot),Vx)
+
+        # Longitufinal force
         Fxtf = Cxf*sf
         Fxtr = Cxr*sr
 
-        # ODE's
-        Vy_dot = -Vx*psi_dot + \
-            (1/m)*(Cf*((Vy+a*psi_dot)/Vx-self.steering(t))+Cr*((Vy-b*psi_dot)/Vx))
-        Vx_dot = Vy*psi_dot+(sf*Cxf+sr*Cxr)/m-self.steering(t) * \
-            Cf*((Vy+a*psi_dot)/Vx-self.steering(t))/m
-        dpsi_dot = 1/Iz * \
-            (a*Cf*((Vy+a*psi_dot)/Vx-self.steering(t))-b*Cr*((Vy-b*psi_dot)/Vx))
-        dwf = -(1/Jw)*Fxtf*Rr
-        dwr = -(1/Jw)*Fxtr*Rr
+        # Lateral force
+        Fytf = -Cf*delta_f
+        Fytr = -Cr*delta_r
 
-        return np.stack([Vy_dot, Vx_dot, dpsi_dot, dwf, dwr])
+        # ODE's
+        Vy_dot = -Vx*psi_dot + (Fxtf*np.sin(st_a) + Fytf*np.cos(st_a) + Fytr)/mt
+        Vx_dot = Vy*psi_dot + (Fxtf*np.cos(st_a) - Fytf*np.sin(st_a) + Fxtr)/mt
+        dpsi_dot = (a*(Fytf*np.cos(st_a) + Fxtf*np.sin(st_a)) - b*Fytr)/Jz
+        dx = Vx*np.cos(psi) - Vy*np.sin(psi)
+        dy = Vx*np.sin(psi) + Vy*np.cos(psi)
+        dpsi = psi_dot
+
+        # rolling resistance
+        rolling_res_f = -rr * np.abs(self.Fzgf) * np.sign(wf)
+        rolling_res_r = -rr * np.abs(self.Fzgr) * np.sign(wr)
+
+        # Brake Torques of each wheel
+        br_t_f = - np.sign(wf) * self.brake_torque(t)
+        br_t_r = - np.sign(wr) * self.brake_torque(t)
+
+
+        # Wheel rotational model - Dividing by 4 still - this is slighly confusing as there are only 2 wheels
+        # However the point is to apply a torque that is the same as the chrono vehicle which has 4 wheels
+        dwf=(1/Jw)*(self.drive_torque(t,wf)/4 + rolling_res_f + br_t_f - Fxtf*Rf)
+        dwr=(1/Jw)*(self.drive_torque(t,wr)/4 + rolling_res_r + br_t_r - Fxtr*Rr)
+
+
+        # The normal forces at four tires are determined using d'alemberts principle
+        Z1 = (m*g*b)/(2*(a+b))+(muf*g)/2
+        Z4 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+        self.Fzgf = Z1-Z4
+        Z5 = (m*g*a)/(2*(a+b))+(mur*g)/2
+        Z8 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+        self.Fzgr = Z5+Z8
+
+        # These vertical forces cannot be lesser than 0 as that means that the wheel is off the ground
+        if(self.Fzgf < 0):
+            self.Fzgf = 0
+        if(self.Fzgr < 0):
+            self.Fzgr = 0
+
+        # Tire deflection calculated using the tire stiffness and the normal force on the tires
+        self.xtf = self.Fzgf/ktf
+        self.xtr = self.Fzgr/ktr
+
+
+        if(self.debug):
+            self.t_arr.append(t)
+            self.ff.append(self.Fzgf)
+            self.fr.append(self.Fzgr)
+            self.dt.append(self.drive_torque(t, wr)/4)
+            self.fdt.append(Fxtf*Rf)
+            self.rdt.append(rolling_res_f)
+            self.s_arr.append(sr)
+            self.xtf_ar.append(self.xtf)
+
+        return np.stack([dx, dy, Vx_dot, Vy_dot, dpsi, dpsi_dot, dwf, dwr])
+
+    def model_fiala(self, t, state):
+        g = self.g
+        a, b, h, Cf, Cr, Cxf, Cxr, ktf, ktr, m, muf, mur, Jz, r0, Jw, rr = list(self.params.values())
+        x, y, Vx, Vy, psi, psi_dot, wf, wr = state
+
+        mt=m+2*muf+2*mur # vehicle total mass
+
+        # instataneous tire radius
+        Rf=r0-self.xtf
+        Rr=r0-self.xtr
+        huf = Rf
+        hur = Rr
+
+        # the steering angle inputted to the wheels
+        st_a = self.steering(t) * self.max_steer
+
+        # longitudinal slip
+        sf = (Rf*wf-(Vx*np.cos(st_a)+(Vy+a*psi_dot)*np.sin(st_a))) / \
+            np.abs(Vx*np.cos(st_a) +
+                   (Vy+a*psi_dot)*np.sin(st_a))
+        sr = (Rr*wr-Vx)/np.abs(Vx)
+
+        # lateral slip
+        delta_f = np.arctan2((Vy+a*psi_dot),Vx)-(st_a)
+        delta_r = np.arctan2((Vy-b*psi_dot),Vx)
+
+        # comprehensive slip ratio
+        ss_f = min(np.sqrt(sf**2 + np.tan(delta_f)**2), 1.)
+        ss_r = min(np.sqrt(sr**2 + np.tan(delta_r)**2), 1.)
+
+        # Coefficient of friction based on the comprehensive slip
+        u_f = self.umax - (self.umax - self.umin)*ss_f
+        u_r = self.umax - (self.umax - self.umin)*ss_r
+
+        # critical longitudinal slip
+        s_crit_f = np.abs((u_f * self.Fzgf) / (2 * Cxf))
+        s_crit_r = np.abs((u_r * self.Fzgr) / (2 * Cxr))
+
+        # critical lateral slip
+        al_crit_f = np.arctan((3*u_f * np.abs(self.Fzgf))/Cf)
+        al_crit_r = np.arctan((3*u_r * np.abs(self.Fzgr))/Cr)
+
+
+        # longitudinal forces based on whether the tire is in the elastic regime or the sliding regime
+        if(np.abs(sf) < s_crit_f):
+            Fxtf = Cxf*sf
+        else:
+            Fxtf_1 = u_f * np.abs(self.Fzgf)
+            Fxtf_2 = np.abs((u_f * self.Fzgf)**2 / (4 * sf * Cxf))
+            Fxtf = np.sign(sf)*(Fxtf_1 - Fxtf_2)
+        
+        if(np.abs(sr) < s_crit_r):
+            Fxtr = Cxr*sr
+        else:
+            Fxtr_1 = u_r * np.abs(self.Fzgr)
+            Fxtr_2 = np.abs((u_r * self.Fzgr)**2 / (4 * sr * Cxr))
+            Fxtr = np.sign(sr)*(Fxtr_1 - Fxtr_2)
+
+        # lateral forces based on whether the tire is in elastic regime or the sliding regime 
+        if(np.abs(delta_f) <= al_crit_f):
+            h_ = 1 - ((Cf * np.abs(np.tan(delta_f))) / (3 * u_f * np.abs(self.Fzgf)))
+            Fytf = -u_f * np.abs(self.Fzgf) * (1-h_**3)*np.sign(delta_f)
+        else:
+            Fytf = -u_f * np.abs(self.Fzgf) * np.sign(delta_f)
+
+        if(np.abs(delta_r) <= al_crit_r):
+            h_ = 1 - ((Cr * np.abs(np.tan(delta_r))) / (3 * u_r * np.abs(self.Fzgr)))
+            Fytr = -u_r * np.abs(self.Fzgr) * (1-h_**3)*np.sign(delta_r)
+        else:
+            Fytr = -u_r * np.abs(self.Fzgr) * np.sign(delta_r)
+
+        # ODE's
+        Vy_dot = -Vx*psi_dot + (Fxtf*np.sin(st_a) + Fytf*np.cos(st_a) + Fytr)/mt
+        Vx_dot = Vy*psi_dot + (Fxtf*np.cos(st_a) - Fytf*np.sin(st_a) + Fxtr)/mt
+        dpsi_dot = (a*(Fytf*np.cos(st_a) + Fxtf*np.sin(st_a)) - b*Fytr)/Jz
+        dx = Vx*np.cos(psi) - Vy*np.sin(psi)
+        dy = Vx*np.sin(psi) + Vy*np.cos(psi)
+        dpsi = psi_dot
+
+        # rolling resistance
+        rolling_res_f = -rr * np.abs(self.Fzgf) * np.sign(wf)
+        rolling_res_r = -rr * np.abs(self.Fzgr) * np.sign(wr)
+
+        # Brake Torques of each wheel
+        br_t_f = - np.sign(wf) * self.brake_torque(t)
+        br_t_r = - np.sign(wr) * self.brake_torque(t)
+
+
+        # Wheel rotational model - Dividing by 4 still - this is slighly confusing as there are only 2 wheels
+        # However the point is to apply a torque that is the same as the chrono vehicle which has 4 wheels
+        dwf=(1/Jw)*(self.drive_torque(t,wf)/4 + rolling_res_f + br_t_f - Fxtf*Rf)
+        dwr=(1/Jw)*(self.drive_torque(t,wr)/4 + rolling_res_r + br_t_r - Fxtr*Rr)
+
+
+        # The normal forces at four tires are determined using d'alemberts principle
+        Z1 = (m*g*b)/(2*(a+b))+(muf*g)/2
+        Z4 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+        self.Fzgf = Z1-Z4
+        Z5 = (m*g*a)/(2*(a+b))+(mur*g)/2
+        Z8 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+        self.Fzgr = Z5+Z8
+
+        # These vertical forces cannot be lesser than 0 as that means that the wheel is off the ground
+        if(self.Fzgf < 0):
+            self.Fzgf = 0
+        if(self.Fzgr < 0):
+            self.Fzgr = 0
+
+        # Tire deflection calculated using the tire stiffness and the normal force on the tires
+        self.xtf = self.Fzgf/ktf
+        self.xtr = self.Fzgr/ktr
+
+
+        if(self.debug):
+            self.t_arr.append(t)
+            self.ff.append(self.Fzgf)
+            self.fr.append(self.Fzgr)
+            self.dt.append(self.drive_torque(t, wr)/4)
+            self.fdt.append(Fxtf*Rf)
+            self.rdt.append(rolling_res_f)
+            self.s_arr.append(sr)
+            self.xtf_ar.append(self.xtf)
+
+        return np.stack([dx, dy, Vx_dot, Vy_dot, dpsi, dpsi_dot, dwf, dwr])    
+
+    # function to obtain the 2nd level variables - needed for the half-implicit solver
+    def lvl_2_fiala(self,t,state):
+        g = self.g
+        a, b, h, Cf, Cr, Cxf, Cxr, ktf, ktr, m, muf, mur, Jz, r0, Jw, rr = list(self.params.values())
+        x, y, Vx, Vy, psi, psi_dot, wf, wr = state
+
+        mt=m+2*muf+2*mur # vehicle total mass
+
+        # instataneous tire radius
+        Rf=r0-self.xtf
+        Rr=r0-self.xtr
+        huf = Rf
+        hur = Rr
+
+        # the steering angle inputted to the wheels
+        st_a = self.steering(t) * self.max_steer
+
+        # longitudinal slip
+        sf = (Rf*wf-(Vx*np.cos(st_a)+(Vy+a*psi_dot)*np.sin(st_a))) / \
+            np.abs(Vx*np.cos(st_a) +
+                   (Vy+a*psi_dot)*np.sin(st_a))
+        sr = (Rr*wr-Vx)/np.abs(Vx)
+
+        # lateral slip
+        delta_f = np.arctan2((Vy+a*psi_dot),Vx)-(st_a)
+        delta_r = np.arctan2((Vy-b*psi_dot),Vx)
+
+        # comprehensive slip ratio
+        ss_f = min(np.sqrt(sf**2 + np.tan(delta_f)**2), 1.)
+        ss_r = min(np.sqrt(sr**2 + np.tan(delta_r)**2), 1.)
+
+        # Coefficient of friction based on the comprehensive slip
+        u_f = self.umax - (self.umax - self.umin)*ss_f
+        u_r = self.umax - (self.umax - self.umin)*ss_r
+
+        # critical longitudinal slip
+        s_crit_f = np.abs((u_f * self.Fzgf) / (2 * Cxf))
+        s_crit_r = np.abs((u_r * self.Fzgr) / (2 * Cxr))
+
+        # critical lateral slip
+        al_crit_f = np.arctan((3*u_f * np.abs(self.Fzgf))/Cf)
+        al_crit_r = np.arctan((3*u_r * np.abs(self.Fzgr))/Cr)
+
+        # longitudinal forces based on whether the tire is in the elastic regime or the sliding regime
+        if(np.abs(sf) < s_crit_f):
+            Fxtf = Cxf*sf
+        else:
+            Fxtf_1 = u_f * np.abs(self.Fzgf)
+            Fxtf_2 = np.abs((u_f * self.Fzgf)**2 / (4 * sf * Cxf))
+            Fxtf = np.sign(sf)*(Fxtf_1 - Fxtf_2)
+        
+        if(np.abs(sr) < s_crit_r):
+            Fxtr = Cxr*sr
+        else:
+            Fxtr_1 = u_r * np.abs(self.Fzgr)
+            Fxtr_2 = np.abs((u_r * self.Fzgr)**2 / (4 * sr * Cxr))
+            Fxtr = np.sign(sr)*(Fxtr_1 - Fxtr_2)
+
+        # lateral forces based on whether the tire is in elastic regime or the sliding regime 
+        if(np.abs(delta_f) <= al_crit_f):
+            h_ = 1 - ((Cf * np.abs(np.tan(delta_f))) / (3 * u_f * np.abs(self.Fzgf)))
+            Fytf = -u_f * np.abs(self.Fzgf) * (1-h_**3)*np.sign(delta_f)
+        else:
+            Fytf = -u_f * np.abs(self.Fzgf) * np.sign(delta_f)
+
+        if(np.abs(delta_r) <= al_crit_r):
+            h_ = 1 - ((Cr * np.abs(np.tan(delta_r))) / (3 * u_r * np.abs(self.Fzgr)))
+            Fytr = -u_r * np.abs(self.Fzgr) * (1-h_**3)*np.sign(delta_r)
+        else:
+            Fytr = -u_r * np.abs(self.Fzgr) * np.sign(delta_r)
+
+        # ODE's
+        Vy_dot = -Vx*psi_dot + (Fxtf*np.sin(st_a) + Fytf*np.cos(st_a) + Fytr)/mt
+        Vx_dot = Vy*psi_dot + (Fxtf*np.cos(st_a) - Fytf*np.sin(st_a) + Fxtr)/mt
+        dpsi_dot = (a*(Fytf*np.cos(st_a) + Fxtf*np.sin(st_a)) - b*Fytr)/Jz
+
+        # rolling resistance
+        rolling_res_f = -rr * np.abs(self.Fzgf) * np.sign(wf)
+        rolling_res_r = -rr * np.abs(self.Fzgr) * np.sign(wr)
+
+        # Brake Torques of each wheel
+        br_t_f = - np.sign(wf) * self.brake_torque(t)
+        br_t_r = - np.sign(wr) * self.brake_torque(t)
+
+
+        # Wheel rotational model - Dividing by 4 still - this is slighly confusing as there are only 2 wheels
+        # However the point is to apply a torque that is the same as the chrono vehicle which has 4 wheels
+        dwf=(1/Jw)*(self.drive_torque(t,wf)/4 + rolling_res_f + br_t_f - Fxtf*Rf)
+        dwr=(1/Jw)*(self.drive_torque(t,wr)/4 + rolling_res_r + br_t_r - Fxtr*Rr)
+
+
+        # The normal forces at four tires are determined using d'alemberts principle
+        Z1 = (m*g*b)/(2*(a+b))+(muf*g)/2
+        Z4 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+        self.Fzgf = Z1-Z4
+        Z5 = (m*g*a)/(2*(a+b))+(mur*g)/2
+        Z8 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+        self.Fzgr = Z5+Z8
+
+        # These vertical forces cannot be lesser than 0 as that means that the wheel is off the ground
+        if(self.Fzgf < 0):
+            self.Fzgf = 0
+        if(self.Fzgr < 0):
+            self.Fzgr = 0
+
+        # Tire deflection calculated using the tire stiffness and the normal force on the tires
+        self.xtf = self.Fzgf/ktf
+        self.xtr = self.Fzgr/ktr
+
+
+        if(self.debug):
+            self.dt.append(self.drive_torque(t, wr)/4)
+            self.fdt.append(Fxtf*Rf)
+            self.rdt.append(rolling_res_f)
+            self.s_arr.append(sr)
+
+        return np.stack([Vx_dot, Vy_dot, dpsi_dot, dwf, dwr])
+
+    # half implicit solver
+    def solve_half_impl(self,t_span,t_eval,tbar):
+        a, b, h, Cf, Cr, Cxf, Cxr, ktf, ktr, m, muf, mur, Jz, r0, Jw, rr = list(self.params.values())
+        g = 9.8
+        mt=m+2*muf+2*mur # vehicle total mass
+
+        time_steps = np.arange(t_span[0]+tbar,t_span[1]+0.0000001,tbar)
+        self.level_1_vars = np.array([self.states['Vx'],self.states['Vy'],self.states['psi_dot'],self.states['wf'],self.states['wr']])
+        self.level_0_vars = np.array([self.states['x'],self.states['y'],self.states['psi']])
+
+        # Save n every 
+        n_ = round((t_eval[1]-t_eval[0])/tbar)
+        
+        # For saving the results at t_eval
+        count = 1
+
+        outs = np.empty((len(t_eval),len(self.states)))
+        outs[0] = (np.array(list(self.states.values())))
+
+        for t in time_steps:
+            # evalaute level 2 variables
+            level_2_vars = self.lvl_2_fiala(t,list(self.states.values()))
+
+            # use new level 2 variables to update level 1 variables
+            self.level_1_vars = self.level_1_vars + tbar * np.array(level_2_vars)
+
+            # use new level 1 varaibles to update level 0 variables - first update vehicle global coordiantes
+            self.level_0_vars[0] = self.level_0_vars[0] + tbar * (self.level_1_vars[0]*np.cos(self.level_0_vars[2]) - 
+            self.level_1_vars[1]*np.sin(self.level_0_vars[2]))
+
+            self.level_0_vars[1] = self.level_0_vars[1] + tbar * (self.level_1_vars[0]*np.sin(self.level_0_vars[2]) + 
+            self.level_1_vars[1]*np.cos(self.level_0_vars[2]))
+
+            # update the yaw angle
+            self.level_0_vars[2] = self.level_0_vars[2] + tbar * (self.level_1_vars[2])
+
+            # update the satate of the vehicle
+            x,y,psi = self.level_0_vars
+            Vx,Vy,psi_dot,wf,wr = self.level_1_vars
+            Vx_dot,Vy_dot,dpsi_dot,dwf,dwr = level_2_vars
+            st = [x,y,Vx,Vy,psi,psi_dot,wf,wr]
+            self.states.update(zip(self.states,st))
+
+            # use the updated state the evalaute the normal forces, tire deflection 
+            # and inst. tire radius for the next time step
+            
+            # instataneous tire radius
+            Rf=r0-self.xtf
+            Rr=r0-self.xtr
+            huf = Rf
+            hur = Rr
+
+            # The normal forces at four tires are determined using d'alemberts principle
+            Z1 = (m*g*b)/(2*(a+b))+(muf*g)/2
+            Z4 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+            self.Fzgf = Z1-Z4
+            Z5 = (m*g*a)/(2*(a+b))+(mur*g)/2
+            Z8 = ((m*h+muf*huf+mur*hur)*(Vx_dot-psi_dot*Vy))/(2*(a+b))
+            self.Fzgr = Z5+Z8
+
+            # These vertical forces cannot be lesser than 0 as that means that the wheel is off the ground
+            if(self.Fzgf < 0):
+                self.Fzgf = 0
+            if(self.Fzgr < 0):
+                self.Fzgr = 0
+
+            # Tire deflection calculated using the tire stiffness and the normal force on the tires
+            self.xtf = self.Fzgf/ktf
+            self.xtr = self.Fzgr/ktr
+
+            #DEBUG
+            if(self.debug):
+                self.t_arr.append(t)
+                self.ff.append(self.Fzgf)
+                self.fr.append(self.Fzgr)
+                self.xtf_ar.append(self.xtf)
+
+            if(count%n_ == 0):
+                outs[round(count/n_)] = (np.array(list(self.states.values())))
+            count = count + 1
+        return outs 
+
 
     # A wrapper function for maybe a few packages - starting with solve_ivp, odeint
-    def solve(self, package='solve_ivp', t_eval=None, **kwargs):
+    def solve(self,package = 'solve_ivp',tire_model = 0,t_eval = None,tbar = 1e-2,**kwargs):
         try:
             self.steering
         except:
-            raise Exception(
-                "Please provide steering controls for the vehicle with 'set_steering' method")
+            raise Exception("Please provide steering controls for the vehicle with 'set_steering' method")
+        
+        try:
+            self.throttle
+        except:
+            raise Exception("Please provide throttle controls for the vehicle with 'set_throttle' method")
 
         if t_eval is None:
-            raise Exception(
-                "Please provide times steps at which you want the solution to be evaluated")
+            raise Exception("Please provide times steps at which you want the solution to be evaluated")
 
-        if(package == 'solve_ivp'):
-            return solve_ivp(self.model, t_span=[t_eval[0], t_eval[-1]], y0=list(self.states.values()), vectorized=True, t_eval=t_eval, **kwargs)
-        elif(package == 'odeint'):
-            return odeint(self.model, y0=list(self.states.values()), t=t_eval, tfirst=True, **kwargs)
+        try:
+            self.brake
+        except:
+            def zero_brake(t):
+                return 0*t
+            self.brake = zero_brake
+            self.max_brake_torque = 4000
+
+        # Need the start time for the smoothing function
+        self.start_time = t_eval[0]
+
+        if(tire_model == 1):
+            if(package == 'half_implicit'):
+                return self.solve_half_impl(t_span = [t_eval[0],t_eval[-1]],t_eval = t_eval,tbar = 1e-2)
+            else:
+                return solve_ivp(self.model_fiala,t_span=[t_eval[0],t_eval[-1]],y0 = list(self.states.values()),
+                vectorized = False,
+                t_eval = t_eval,**kwargs)
+        else:
+            return solve_ivp(self.model_linear,t_span=[t_eval[0],t_eval[-1]],y0 = list(self.states.values()),vectorized = False,
+            t_eval = t_eval,**kwargs)
 
 
 ##################################################################################
@@ -276,13 +860,15 @@ class vd_8dof:
     def __init__(self, parameters=None, states=None):
         self.g = 9.8
 
-        # Other parameters of the Fiala Tire model that are not used anywhere as of now
+        # Fiala Tire friction parameters
         self.umin = 0.5568
         self.umax = 0.9835
+
+        # Tire relaxation lengths, not used currently
         self.xrel = 1.0
         self.yrel = 1.0
 
-        # The smoothing time - Might not use in the end
+        # The smoothing time - Commented out currently
         self.trans_time = 0.2
 
         # Lists used for storing values for debugging
@@ -297,6 +883,7 @@ class vd_8dof:
         self.s_arr = []
         self.xtrf_ar = []
 
+        self.debug = 0
         if parameters is not None:
             if isinstance(parameters, list):
                 raise Exception(
@@ -1439,10 +2026,8 @@ class vd_8dof:
         # For saving the results at t_eval
         count = 1
 
-
         outs = np.empty((len(t_eval),len(self.states)))
         outs[0] = (np.array(list(self.states.values())))
-        mts = []
 
         for t in time_steps:
             level_2_vars = self.lvl_2_fiala(t,list(self.states.values()))
@@ -1541,6 +2126,7 @@ class vd_8dof:
             def zero_brake(t):
                 return 0*t
             self.brake = zero_brake
+            self.max_brake_torque = 4000
 
         # Need the start time for the smoothing function
         self.start_time = t_eval[0]

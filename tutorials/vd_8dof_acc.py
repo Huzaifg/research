@@ -21,11 +21,11 @@ import time
 def loglike(theta,data):
 
     sigmas = np.array(theta[-(data.shape[0]):]).reshape(-1,1)
-
+    n = data.shape[1]  
 	#Need to update the parameters using the update params method
     vehicle.update_params(m=2097.85,muf=127.866,mur=129.98,a= 1.6889,b =1.6889,h = 0.713,cf = 1.82,cr = 1.82,Jx = 1289,Jz = 4519,Jxz = 3.265,
-    Cf=39000,Cr=48000,r0=0.47,ktf=326332,ktr=326332,krof=31000.0,kror=31000.0,brof=3300.000,bror=3300.000,hrcf=0.379,hrcr=0.327,Jw=11,
-    Cxf = theta[0],Cxr = theta[1],rr=0.0125)
+    Cf=50000,Cr=50000,r0=0.47,ktf=326332,ktr=326332,krof=37500,kror=37500,brof=15000,bror=15000,hrcf=0.379,hrcr=0.327,Jw=11,
+    Cxf = theta[0],Cxr = theta[1],rr=0.0175)
 
 
     mod = vehicle.solve_half_impl(t_span = [t_eval[0],t_eval[-1]],t_eval = t_eval,tbar = 5e-3)
@@ -33,7 +33,7 @@ def loglike(theta,data):
 
     vehicle.reset_state(init_state=st)
 
-    return -np.sum(np.sum((mod[[2,8,9],:] - data)**2/(2.*sigmas**2))/np.linalg.norm(data,axis = 1))
+    return -np.sum(((n*np.log(2*np.pi * sigmas**2)/2) + np.sum((mod[[2,8,9],:] - data)**2/(2.*sigmas**2)))/np.linalg.norm(data,axis = 1))
 
 #The gradient of the log likelihood using finite differences - Needed for gradient based methods
 def grad_loglike(theta,data):
@@ -107,14 +107,14 @@ def main():
 
 
 
-    #Intiatting the loglikelihood object which is a theano operation (op)
+    #Initiating the loglikelihood object which is a aesara operation (op)
     like = LogLike(loglike,data)
     with pm.Model() as model:
         Cxf = pm.Uniform("Cxf",lower=1000,upper=50000,initval = 20000)
         Cxr = pm.Uniform("Cxr",lower=1000,upper=50000,initval = 20000)
-        sigmaLOV = pm.HalfNormal("sigmaLOV",sigma = 0.4,initval=0.2)
-        sigmaLFW = pm.HalfNormal("sigmaLFW",sigma = 0.9,initval=0.8)
-        sigmaLRW = pm.HalfNormal("sigmaLRW",sigma = 0.9,initval=0.8)
+        sigmaLOV = pm.HalfNormal("sigmaLOV",sigma = 0.1,initval=0.1)
+        sigmaLFW = pm.HalfNormal("sigmaLFW",sigma = 1,initval=0.8)
+        sigmaLRW = pm.HalfNormal("sigmaLRW",sigma = 1,initval=0.8)
 
         theta_ = [Cxf,Cxr,sigmaLOV,sigmaLFW,sigmaLRW]
         theta = tt.as_tensor_variable(theta_)
@@ -128,10 +128,10 @@ def main():
         if(sys.argv[2] == "nuts"):
             # step = pm.NUTS()
             # pm.sampling.init_nuts()
-            idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=4)
+            idata = pm.sample(ndraws ,tune=nburn,discard_tuned_samples=True,return_inferencedata=True,target_accept = 0.9, cores=8)
         elif(sys.argv[2] == "met"):
             step = pm.Metropolis()
-            idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=4)
+            idata = pm.sample(ndraws,step=step, tune=nburn,discard_tuned_samples=True,return_inferencedata=True,cores=8)
         elif(sys.argv[2] == "smc"):
             idata = pm.sample_smc(draws = ndraws,parallel=True,cores=8,return_inferencedata=True,progressbar = True)
         else:
@@ -191,7 +191,9 @@ if __name__ == "__main__":
             return ramp_throt1(t)
         else:
             return ramp_throt2(t)
-        # return np.where(t<4.5,ramp_throt1(t),ramp_throt2(t))
+
+    def brake_tor(t):
+        return 0 * t
 
     state = pd.read_csv("calib_mod_acc_3_5.csv",sep=',',header='infer')
 
@@ -204,6 +206,7 @@ if __name__ == "__main__":
     # Set the steering and the throttle functions we just created above
     vehicle.set_steering(zero_st)
     vehicle.set_throttle(ramp_throt,gr=0.3*0.2)
+    vehicle.set_braking(brake_tor)
     vehicle.debug = 0
     main()
 
