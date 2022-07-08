@@ -21,12 +21,27 @@ from vd_bi_mod import vehicle_bi
 
 def main():
 
+
 	vbdata = sio.loadmat('vd_14dof_11000_sin.mat')
 	time_o = vbdata['tDash'].reshape(-1,)
 	st_inp_o = vbdata['delta4'].reshape(-1,)
 	# st_inp_rad = st_inp_o*np.pi/180
 	lat_acc_o = vbdata['ay1'].reshape(-1,)
 	lat_vel_o = vbdata['lat_vel'].reshape(-1,)
+	roll_angle_o = vbdata['roll_angle'].reshape(-1,)
+	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
+	psi_angle_o = vbdata['psi_angle'].reshape(-1,)
+
+	##vehicle model parameters
+	a=1.14  # distance of c.g. from front axle (m)
+	b=1.4  # distance of c.g. from rear axle  (m)
+	Cf=-44000*2 # front axle cornering stiffness (N/rad)
+	Cr=-47000*2 # rear axle cornering stiffness (N/rad)
+	Cxf=5000*2 # front axle longitudinal stiffness (N)
+	Cxr=5000*2 # rear axle longitudinal stiffness (N)
+	m=1720  # the mass of the vehicle (kg)
+	Iz=2420 # yaw moment of inertia (kg.m^2)
+
 	long_vel_o = vbdata['long_vel'].reshape(-1,)
 	roll_angle_o = vbdata['roll_angle'].reshape(-1,)
 	yaw_rate_o = vbdata['yaw_rate'].reshape(-1,)
@@ -47,6 +62,7 @@ def main():
 	m=1720  # the mass of the vehicle (kg)
 	Iz=2000 # yaw moment of inertia (kg.m^2)
 	# Iz = 2499.813
+
 	Rr=0.285 # wheel radius
 	Jw=1*2  # wheel roll inertia
 
@@ -68,6 +84,7 @@ def main():
 
 
 
+
 	rows  = mod_data.shape[0]
 	# mpl.style.use('plot_style.mplstyle')
 	mpl.figure(1,figsize = (8,8))
@@ -85,6 +102,8 @@ def main():
 
 
 
+
 if __name__ == "__main__":
 	main()
+
 
